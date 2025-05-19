@@ -1,0 +1,4 @@
+- secure POST for payload
+- secure folder for keys
+- show number of unsynced entries
+- refine batch post for individual errors

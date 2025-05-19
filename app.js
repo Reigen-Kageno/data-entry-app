@@ -93,7 +93,7 @@ async function updateEntryStatus(id, isSynced) {
   try {
     const count = await db.formEntries.update(id, { syncStatus: isSynced ? 1 : 0 });
     if (count) {
-      console.log(`Entry ${id} status updated to ${newStatus}`);
+      console.log(`Entry ${id} status updated to ${syncStatus}`);
     } else {
       console.log(`Entry ${id} not found for update.`);
     }
@@ -196,7 +196,7 @@ async function deleteEntriesByDate(dateString) {
 // demoDexie(); // Call this to test if you like
 
 // --- Sync Logic ---
-const SYNC_ENDPOINT_URL = 'https://prod-81.westeurope.logic.azure.com:443/workflows/5495373d46e34c7cbaf64e9560b17191/triggers/manual/paths/invoke?api-version=2016-06-01'; // Replace this!
+const SYNC_ENDPOINT_URL = 'https://prod-81.westeurope.logic.azure.com:443/workflows/5495373d46e34c7cbaf64e9560b17191/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=YOHr275u2yqv_2ggNWbdMl6H_2uHoe9N2uxi9yf8Ua0'; // Replace this!
 
 async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
   if (!navigator.onLine) {
@@ -208,81 +208,101 @@ async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
 
   console.log("Online. Attempting to sync entries...");
   if (showStatus) updateSyncStatusUI(true, manualTrigger ? 'Manual Sync: Syncing...' : 'Syncing...');
+  let queuedEntries = [];
+  let queuedStockChecks = [];
 
-  const queuedEntries = await getQueuedEntries();
+  try {
+    // Get all unsynced entries and stock checks
+    queuedEntries = await getQueuedEntries();
+    queuedStockChecks = await db.stockChecks.where('syncStatus').equals(0).toArray();
 
-  if (queuedEntries.length === 0) {
-    console.log(manualTrigger ? "Manual Sync: No entries to sync." : "No entries to sync.");
-    if (showStatus) updateSyncStatusUI(true, 'All entries synced.');
-    return;
-  }
+    if (queuedEntries.length === 0 && queuedStockChecks.length === 0) {
+      console.log(manualTrigger ? "Manual Sync: No data to sync." : "No data to sync.");
+      if (showStatus) updateSyncStatusUI(true, 'All data already synced.');
+      return;
+    }
 
-  // We will send entries one by one. If your backend can handle batches,
-  // you could group them here before sending.
+    console.log(`Found ${queuedEntries.length} entries and ${queuedStockChecks.length} stock checks to sync.`);
+    if (showStatus) updateSyncStatusUI(true, `Syncing ${queuedEntries.length} entries and ${queuedStockChecks.length} stock checks...`);
 
-  for (const entry of queuedEntries) {
+    // Prepare the consolidated payload
+    const syncPayload = {
+      entries: queuedEntries.map(entry => {
+        const { id, status, ...data } = entry;
+        return data;
+      }),
+      stockChecks: queuedStockChecks.map(check => {
+        const { syncStatus, ...data } = check;
+        return data;
+      })
+    };
+
+    // Send everything in one request
+    const response = await fetch(SYNC_ENDPOINT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(syncPayload),
+    });
+
+    let responseData;
     try {
-      // The entry object from Dexie should now match the structure needed by the backend.
-      // For now, we send the whole entry, excluding its local 'id' and 'status'.
-      const { id, status, ...payload } = entry;
+      responseData = await response.json();
+    } catch (e) {
+      responseData = null;
+    }
 
-      const response = await fetch(SYNC_ENDPOINT_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });      if (response.ok) {
-        console.log(`Entry ${id} (Machine: ${entry.machine}) synced successfully.`);
-        // Mark as synced (syncStatus = 1)
-        await updateEntryStatus(id, true);
-        // Option: Delete after successful sync (if you don't need to keep synced items locally)
-        // await deleteEntry(id);
-        if (showStatus)updateSyncStatusUI(true, manualTrigger ? `Manual Sync: Synced entry ${id}.` : `Synced entry ${id}.`);
-      } else {
-        console.error(`Error syncing entry ${id} (Machine: ${entry.machine}): ${response.status} ${response.statusText}`);
-        // Keep status as 'queued' so it's retried later
-        // Maybe add a retry count or error message to the entry in Dexie
-        // Handle non-OK responses: maybe update status to 'failed', retry later, etc.
-        updateSyncStatusUI(true, `Error syncing entry ${id}.`);
+    if (response.ok) {
+      // Update local sync status for all successfully synced items
+      for (const entry of queuedEntries) {
+        await updateEntryStatus(entry.id, true);
       }
-    } catch (error) {
-      console.error(`Network error or exception syncing entry ${entry.id}:`, error);
-      updateSyncStatusUI(true, 'Network error during sync.');
-      // If one fails, we stop and try again later to maintain order if necessary
-      // or you could implement a more robust retry for individual items.
-      return; // Stop syncing on the first error to try again later
-    }
-  }    // Sync stock checks
-    let queuedStockChecks = [];
-    try {
-        queuedStockChecks = await db.stockChecks.where('syncStatus').equals(0).toArray();
-        console.log(`Found ${queuedStockChecks.length} stock checks to sync.`);
-    } catch (err) {
-        console.warn('Error fetching unsynced stock checks:', err);
-        return; // Exit sync if we can't query properly
+
+      for (const check of queuedStockChecks) {
+        if (check.resourceName && check.date) {
+          await db.stockChecks.update(
+            [check.resourceName, check.date],
+            { syncStatus: 1 }
+          );
+        }
+      }
+
+      console.log('All data synced successfully');
+      if (showStatus) updateSyncStatusUI(true, 'Sync completed successfully');
+
+    } else {
+      // Handle different error status codes
+      let errorMessage = '';
+      switch (response.status) {
+        case 400:
+          errorMessage = 'Invalid data format. Please check your entries.';
+          console.error('Sync failed - Invalid data:', responseData?.error || response.statusText);
+          break;
+        case 401:
+          errorMessage = 'Authentication failed. You may need to log in again.';
+          console.error('Sync failed - Authentication error:', response.statusText);
+          break;
+        case 403:
+          errorMessage = 'You do not have permission to sync this data.';
+          break;
+        default:
+          errorMessage = `Server error (${response.status}). Please try again later.`;
+      }
+
+      if (responseData?.error) {
+        errorMessage += ` Details: ${responseData.error}`;
+      }
+
+      console.error('Sync error:', errorMessage);
+      if (showStatus) updateSyncStatusUI(true, `Sync failed: ${errorMessage}`);
+      return; // Exit on error
     }
 
-    for (const stockCheck of queuedStockChecks) {
-    try {
-      const response = await fetch(SYNC_ENDPOINT_URL + "/stock-check", { // Assuming different endpoint or flag
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(stockCheck),
-      });
-if (response.ok) {
-  // Use the compound PK [resourceName, date] to mark as synced
-  if (stockCheck.resourceName && stockCheck.date) {
-    await db.stockChecks.update(
-      [stockCheck.resourceName, stockCheck.date],
-      { syncStatus: 1 }
-    );
-    console.log(`Stock check for ${stockCheck.resourceName} on ${stockCheck.date} synced.`);
-  } else {
-    console.error('Skipping stockCheck update due to invalid key components:', stockCheck);
-  }
-}
-    } catch (error) { /* Handle stock check sync error */ }
+  } catch (error) {
+    console.error('Network or other sync error:', error);
+    if (showStatus) updateSyncStatusUI(true, `Sync failed: ${error.message}`);
+    return;
   }
   // Check remaining unsynced items
   const remainingEntries = await getQueuedEntries();

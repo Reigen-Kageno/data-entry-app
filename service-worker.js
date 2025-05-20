@@ -1,8 +1,11 @@
 const CACHE = 'app-static-v1';
 const ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json'
+  '.',
+  'index.html',
+  'manifest.json',
+  'favicon.ico',
+  'config.global.js',
+  'app.js'
 ];
 
 // On install: cache the shell

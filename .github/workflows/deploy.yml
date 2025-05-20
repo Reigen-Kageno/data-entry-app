@@ -1,0 +1,26 @@
+name: Deploy PWA to GitHub Pages
+on:
+  push:
+    branches: [ main ]          # your default branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # 1️⃣ Generate a config.js from your GitHub Secret
+      - name: Create config.local.js
+        run: |
+          echo "// AUTO‑GENERATED" > config.local.js
+          echo "export const SYNC_ENDPOINT_URL = '${{ secrets.SYNC_ENDPOINT_URL }}';" >> config.local.js
+
+      # 2️⃣ Deploy all files (including the generated config.js)
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages    # or main if you’re using docs/ folder
+          publish_dir: .
+

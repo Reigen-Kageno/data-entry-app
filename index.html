@@ -4,11 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Basalt Site Data Entry</title>
-  <base href="/data-entry-app/">
   <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="manifest.json">
   <!-- Favicon -->
-  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
   <style>
     body { font-family: sans-serif; margin: 16px; }
     .machine-section, .delivery-section, .delivery-entry { border: 1px solid #ccc; padding: 12px; margin-bottom: 16px; border-radius: 8px; }
@@ -92,6 +91,7 @@
   </div>
 
   <!-- Your application script, including Dexie setup and sync logic -->
+  <script type="module" src="./config.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

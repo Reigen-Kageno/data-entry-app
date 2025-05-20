@@ -196,7 +196,7 @@ async function deleteEntriesByDate(dateString) {
 // demoDexie(); // Call this to test if you like
 
 // --- Sync Logic ---
-import { SYNC_ENDPOINT_URL } from './config.local.js'; // Adjust the import path as needed
+import { SYNC_ENDPOINT_URL } from './config.js'; // Adjust the import path as needed
 
 async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
   if (!navigator.onLine) {

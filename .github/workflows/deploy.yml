@@ -15,10 +15,10 @@ jobs:
       - uses: actions/checkout@v3
 
       # 1️⃣ Generate a config.js from your GitHub Secret
-      - name: Create config.js
+      - name: Create config.global.js
         run: |
-          echo "// AUTO‑GENERATED" > config.js
-          echo "export const SYNC_ENDPOINT_URL = '${{ secrets.SYNC_ENDPOINT_URL }}';" >> config.js
+          echo "// AUTO‑GENERATED" > config.global.js
+          echo "window.SYNC_ENDPOINT_URL = '${{ secrets.SYNC_ENDPOINT_URL }}';" >> config.global.js
 
       # 2️⃣ Deploy all files (including the generated config.js)
       - name: Deploy to GitHub Pages

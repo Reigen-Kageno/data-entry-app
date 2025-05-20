@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Basalt Site Data Entry</title>
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="/manifest.json">
+  <!-- Favicon -->
+  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <style>
+    body { font-family: sans-serif; margin: 16px; }
+    .machine-section, .delivery-section, .delivery-entry { border: 1px solid #ccc; padding: 12px; margin-bottom: 16px; border-radius: 8px; }
+    .resource-row, .delivery-entry .resource-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+    .resource-row input, .resource-row select { flex: 1; }
+    .btn { padding: 5px 8px; margin-top: 6px; cursor: pointer; border: none; border-radius: 3px; background: #2196f3; color: white; font-size:0.85em; }
+    .btn.small { padding: 4px 8px; font-size: 0.9em; }
+    .stock-card { display: inline-block; padding: 6px; margin: 3px; border: 1px solid #888; border-radius: 4px; cursor: default; position: relative; width: 120px; vertical-align: top; font-size: 0.85em; }
+    .stock-card .resource-name { font-weight: bold; display: block; margin-bottom: 3px; text-align: center; font-size: 0.95em; cursor: pointer; } /* Make name clickable */
+    .stock-card .stock-delta { font-size:0.8em; margin: 1px 0; }
+    .stock-card .stock-value { font-size: 1em; font-weight: bold; margin: 4px 0; display: block; }
+    .stock-card .measured-stock-display { font-size: 0.8em; color: #555; margin-top: 3px; }
+    .stock-card.disabled { cursor: not-allowed; opacity: 0.6; }
+    .stock-card.disabled:hover { background: none; } /* Prevent hover effect when disabled */
+    .stock-card .badge { position: absolute; top: -6px; right: -6px; background: red; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.8em; }
+    .stock-card:hover { background: #f0f0f0; }
+  </style>
+  <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+  <meta http-equiv="Content-Security-Policy"
+  content="default-src 'self';
+           script-src 'self';
+           connect-src 'self' https://prod-117.westeurope.logic.azure.com;
+           img-src 'self';
+           style-src 'self' 'unsafe-inline';">
+</head>
+<body>
+  <h2>Daily Entry</h2>
+  <label>Date: <input type="date" id="entry-date" name="entry-date" required></label>
+
+
+  <datalist id="machine-list"></datalist>
+
+  <div class="stock-info-section">
+    <h3>Resource Stock & Checks</h3>
+    <div id="resource-stock-cards-container"></div> <!-- Container for stock cards -->
+  </div>
+
+  <form id="entry-form">
+    <div id="machines-container"></div>
+    <button type="button" class="btn" id="add-machine">+ Add Machine</button> <!-- This button will be hidden/shown -->
+    <button type="submit" class="btn" id="save-entries-btn">Save All Entries</button>
+    <button type="button" class="btn" id="edit-entries-btn" style="display:none;">Edit Entries</button> <!-- Initially hidden -->
+  </form>
+  <!-- This p#status will be used by app.js as syncStatus -->
+  <p id="syncStatus">Loading status...</p>
+
+  <template id="machine-template">
+    <div class="machine-section">
+      <label>Machine: <input name="machine" list="machine-list" required></label>
+      <div class="resources-container"></div>
+      <div>
+        <label style="font-size: 0.9em; margin-top: 8px;">Notes for this machine:</label>
+        <textarea name="machine-notes" rows="2" style="width: 100%; box-sizing: border-box; font-size: 0.9em;"></textarea>
+      </div>
+      <button type="button" class="btn small add-resource">+ Add Resource</button>
+    </div>
+  </template>
+
+  <template id="resource-template">
+    <div class="resource-row">
+      <select name="resource">
+        <option>Gasoil</option>
+        <option>HuileMoteur</option>
+        <option>HuileHydraulique</option>
+        <option>HuileLubrification</option>
+        <option>HuileBoite</option>
+        <option>HuilePont</option>
+        <option>HuileDirection</option>
+      </select>
+      <input name="quantity" type="number" placeholder="Quantity" required>
+      <button type="button" class="btn small remove-resource">✕</button>
+    </div>
+  </template>
+
+  <button type="button" class="btn" id="manual-sync-btn" style="margin-top: 20px;">Sync Now</button>
+
+  <!-- Add a general notes field to the form -->
+  <div class="form-group">
+    <label for="general-notes">General Notes:</label>
+    <textarea id="general-notes" name="general-notes" rows="3"></textarea>
+  </div>
+
+  <!-- Your application script, including Dexie setup and sync logic -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>

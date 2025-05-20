@@ -1,0 +1,28 @@
+{
+  "name": "Construction Entry",
+  "short_name": "EntryApp",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2196f3",
+  "icons": [{
+    "src": "icon192.png",
+    "sizes": "192x192",
+    "type": "image/png",
+    "purpose": "any maskable"
+  },{
+    "src": "icon512.png",
+    "sizes": "512x512",
+    "type": "image/png",
+    "purpose": "any maskable"
+  }],
+  "screenshots": [
+    {
+      "src": "images/screenshot-mobile-1.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Main data entry form on mobile"
+    }
+  ]
+}

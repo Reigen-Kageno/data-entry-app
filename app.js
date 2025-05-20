@@ -196,7 +196,7 @@ async function deleteEntriesByDate(dateString) {
 // demoDexie(); // Call this to test if you like
 
 // --- Sync Logic ---
-const SYNC_ENDPOINT_URL = 'https://prod-81.westeurope.logic.azure.com:443/workflows/5495373d46e34c7cbaf64e9560b17191/triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=YOHr275u2yqv_2ggNWbdMl6H_2uHoe9N2uxi9yf8Ua0'; // Replace this!
+import { SYNC_ENDPOINT_URL } from './config.local.js'; // Adjust the import path as needed
 
 async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
   if (!navigator.onLine) {

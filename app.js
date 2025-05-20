@@ -904,7 +904,7 @@ function initializeAppUI() {
     // Register Service Worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => { // Ensure page is loaded before registering SW
-            navigator.serviceWorker.register('/service-worker.js')
+            navigator.serviceWorker.register('service-worker.js')
                 .then(reg => console.log('Service Worker: Registered', reg))
                 .catch(err => console.error('Service Worker: Registration Error', err));
         });

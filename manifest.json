@@ -1,6 +1,6 @@
 {
-  "name": "Construction Entry",
-  "short_name": "EntryApp",
+  "name": "Quarry Data Entry App",
+  "short_name": "Dotations Pout",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#ffffff",

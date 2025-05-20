@@ -1,12 +1,16 @@
 name: Deploy PWA to GitHub Pages
 on:
   push:
-    branches: [ main ]          # your default branch
+    branches: [ main ]
+  
+permissions:
+  contents: write        # allow pushing commits
+  pages: write           # allow updating GitHub Pages
+  id-token: write        # if you use OIDC for other actions
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v3
 

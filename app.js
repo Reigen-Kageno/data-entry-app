@@ -454,6 +454,13 @@ function initializeAppUI() {
         saveBtn.textContent = isEditable ? (editBtn.style.display === 'none' ? 'Save All Entries' : 'Update Entries') : 'Save All Entries';
         editBtn.style.display = isEditable ? 'none' : '';
         updateSyncButtonState();
+// Always re-enable the date picker
+    const dateInput = document.getElementById('entry-date');
+    if (dateInput) {
+        dateInput.readOnly = false;
+        dateInput.disabled = false;
+        dateInput.classList.remove('disabled');
+    }
     }
 
     async function updateCardStockDisplay(resourceName, forDate) {

@@ -353,7 +353,7 @@ function initializeAppUI() {
     console.log("DB is ready. Initializing UI.");
 
     // --- Global-like variables for UI logic --- 
-    const machineOptions = ['FOREUSE FURUKAWA', 'PEL17', 'PEL18', 'CA55', 'CA62', 'CA57', 'CA60', 'GE A Diagne', 'Motopompe', 'Concasseur primaire', 'VHL62', 'VHL21', 'VHL36', 'VHL52', 'DG', 'Livraison', 'LT106', 'LT200', 'HP300', 'BULLDOZER', 'CHA12', 'CHA08', 'GE32 CHINOIS', 'GE35 HIMONSA', 'GE47 CUMMINS', 'GE29 CUMMINS', 'GE A Diagne', 'Convoyeur C1', 'Convoyeur C2', 'Convoyeur C3', 'Convoyeur C4', 'Convoyeur C5', 'Convoyeur C6', 'Convoyeur C6 bis', 'Convoyeur C6 ter', 'Convoyeur C7', 'Convoyeur C8', 'Convoyeur C9', 'Convoyeur C10', 'Convoyeur C11', 'CRIBLE N°1', 'CRIBLE N°2];
+    const machineOptions = ['FOREUSE FURUKAWA', 'PEL17', 'PEL18', 'CA55', 'CA62', 'CA57', 'CA60', 'GE A Diagne', 'Motopompe', 'Concasseur primaire', 'VHL62', 'VHL21', 'VHL36', 'VHL52', 'DG', 'Livraison', 'LT106', 'LT200', 'HP300', 'BULLDOZER', 'CHA12', 'CHA08', 'GE32 CHINOIS', 'GE35 HIMONSA', 'GE47 CUMMINS', 'GE29 CUMMINS', 'GE A Diagne', 'Convoyeur C1', 'Convoyeur C2', 'Convoyeur C3', 'Convoyeur C4', 'Convoyeur C5', 'Convoyeur C6', 'Convoyeur C6 bis', 'Convoyeur C6 ter', 'Convoyeur C7', 'Convoyeur C8', 'Convoyeur C9', 'Convoyeur C10', 'Convoyeur C11', 'CRIBLE N°1', 'CRIBLE N°2'];
     const resources = ['Gasoil', 'HuileMoteur', 'HuileHydraulique', 'HuileLubrification', 'HuileBoite', 'HuilePont', 'HuileDirection'];
     let dailyStockCheckOverrides = {}; // Store for today's stock check overrides. Key: date -> resourceName -> quantityOnHand
 

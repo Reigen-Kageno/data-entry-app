@@ -353,7 +353,7 @@ function initializeAppUI() {
     console.log("DB is ready. Initializing UI.");
 
     // --- Global-like variables for UI logic ---
-    const machineOptions = ['EXC-300', 'BULL-24', 'CRANE-12', 'Livraison'];
+    const machineOptions = ['FOREUSE FURUKAWA', 'PEL17', 'PEL18', 'CA55', 'CA62', 'CA57 citerne', 'GE A Diagne', 'Motopompe', 'Trémie Triple', 'Convoyeur N°1', 'Concasseur', 'Crible BTC', 'Convoyeur N°2', 'Trémie stockage', 'Convoyeur N°3', 'Malaxeur', 'Presse BTC', 'Convoyeur N°4', 'Convoyeur N°5', 'VHL62', 'VHL36', 'VHL52', 'DG', 'Livraison', 'LT106', 'LT200', 'HP300', 'BULLDOZER', 'CHA12', 'PEL17', 'PEL18', 'GE32 CHINOIS', 'GE35 HIMONSA', 'GE47 CUMMINS', 'GE29 CUMMINS', 'GE A Diagne', 'Convoyeur C1', 'Convoyeur C2', 'Convoyeur C3', 'Convoyeur C4', 'Convoyeur C5', 'Convoyeur C6', 'Convoyeur C6 bis', 'Convoyeur C6 ter', 'Convoyeur C7', 'Convoyeur C8', 'Convoyeur C9', 'Convoyeur C10', 'Convoyeur C11', 'CRIBLE N°1', 'CRIBLE N°2'];
     const resources = ['Gasoil', 'HuileMoteur', 'HuileHydraulique', 'HuileLubrification', 'HuileBoite', 'HuilePont', 'HuileDirection'];
     let dailyStockCheckOverrides = {}; // Store for today's stock check overrides. Key: date -> resourceName -> quantityOnHand
 
@@ -622,8 +622,22 @@ function initializeAppUI() {
                     notesLoaded = true;
                 }
             });
-            setFormEditable(false);
-            saveBtn.textContent = 'Save All Entries';
+           // Prevent editing if any form entry OR any stock check for the date is synced
+    const anyEntrySynced = entries.some(entry => entry.syncStatus === 1);
+    const stockChecks = await db.stockChecks.where('date').equals(dateString).toArray();
+    const anyStockSynced = stockChecks.some(check => check.syncStatus === 1);
+    const preventEdit = anyEntrySynced || anyStockSynced;
+    setFormEditable(!preventEdit);
+
+    // Hide or disable the Edit button if any entry/stock is synced
+    if (preventEdit) {
+        editBtn.style.display = 'none'; // or editBtn.disabled = true;
+        if(syncStatusElement) syncStatusElement.textContent += " (Synced entries or stock checks cannot be edited)";
+    } else {
+        editBtn.style.display = '';
+        editBtn.disabled = false;
+    }
+    saveBtn.textContent = 'Save All Entries';
         } else {
             if(syncStatusElement) syncStatusElement.textContent = `No entries found for ${dateString}. Ready for new input.`;
             addMachineSection();

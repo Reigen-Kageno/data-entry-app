@@ -215,4 +215,3 @@ Enhancement of machine selection, zone tracking, and form validation with improv
 - Added code comments for complex logic
 - Updated schema documentation
 - Added testing guidelines
-- Added testing guidelines

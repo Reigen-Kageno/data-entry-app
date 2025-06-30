@@ -26,8 +26,6 @@ const graphConfig = {
 // Initialize MSAL
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 
-// Debug log msalInstance
-console.log('MSAL Instance created:', msalInstance);
 
 // Handle redirect promise
 msalInstance?.handleRedirectPromise()

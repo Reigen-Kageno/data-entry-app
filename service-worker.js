@@ -4,7 +4,7 @@ const ASSETS_TO_CACHE = [
     '/index.html',
     '/app.js',
     '/auth.js',
-    '/config.js',
+    '/config.global.js',
     '/masterData.js',
     '/manifest.json',
     '/favicon.ico',
@@ -13,7 +13,6 @@ const ASSETS_TO_CACHE = [
     'https://unpkg.com/dexie@latest/dist/dexie.js',
     'https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js'
 ];
-
 // Install event - cache assets
 self.addEventListener('install', event => {
     event.waitUntil(

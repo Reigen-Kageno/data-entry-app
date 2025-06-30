@@ -1,8 +1,8 @@
 import { getToken, graphConfig } from './auth.js'; // Use getToken directly
 import config from './config.global.js'; // Import global config for SharePoint list IDs
 
-class MasterDataManager {    constructor(db) {
-        this.db = db;
+class MasterDataManager {
+    constructor(db) {        this.db = db;
         this.machines = [];
         this.initialized = false;
     }

@@ -1,18 +1,54 @@
-So i needed a data entry app with the ability to dynamically add entry dimension (machine or resource) and push that data to our company sharepoint database. That's why forms weren't cutting it so i had to get one done.
-Here is the automatically generated AI summary for the rest 
+# Basalt Site Data Entry App
 
-# Data Entry Application
+This application is designed for SOECO's daily resource consumption tracking. It allows operators to record machine usage and resource consumption data, which syncs with SharePoint for centralized data management.
 
-This application is designed to streamline the data entry process for the SOECO project. It provides a user-friendly interface for inputting and managing data related to [Specify data types, e.g., survey responses, experimental results, etc.].
+## Technical Overview
 
-## Features
+### Database Schema (Version 13)
+For detailed schema definitions, please refer to `PROJECT_CHARTER.md`.
 
-*   **Intuitive Data Entry Forms:**  Clear and organized forms for efficient data input.
-*   **Data Validation:**  Ensures data accuracy by implementing validation rules for each field.
-*   **Data Storage:**  Securely stores entered data in a [Specify database or storage method, e.g., SQLite database, CSV file, etc.].
-*   **Data Retrieval and Editing:**  Allows users to easily access and modify previously entered data.
-*   **User Authentication (Optional):**  Restricts access to authorized personnel (if applicable).
-*   **Data Export (Optional):**  Enables exporting data in various formats (e.g., CSV, Excel) for further analysis (if applicable).
+For a comprehensive technical architecture overview, see `ARCHITECTURE.md`.
+
+### Core Features
+
+#### Machine Data Management
+- SharePoint integration for machine list.
+- Machine selection with autocomplete and validation.
+- Prevents duplicate machine entries per day.
+- Shows machine display name for clarity.
+- Tracks machine active status from SharePoint.
+
+#### Resource Tracking
+```javascript
+const RESOURCES = [
+    'Gasoil', 
+    'HuileMoteur', 
+    'HuileHydraulique', 
+    'HuileLubrification', 
+    'HuileBoite', 
+    'HuilePont', 
+    'HuileDirection'
+];
+```
+
+#### Zone Activity Tracking
+```javascript
+const ZONES = [
+    'Concassage', 
+    'Extraction', 
+    'Autres', 
+    'BTC'
+];
+
+## Development Notes
+
+For a list of known issues, planned features, and future improvements, please refer to the `Todo.MD` file, which serves as the single source of truth for development tasks.
+
+### Deployment Security
+**Important:** The `config.global.js` file contains sensitive information (like client IDs) and is intended for development purposes only. In a production environment, this file must be replaced or its contents secured using environment variables or a secrets management service. Do not commit the production configuration to the repository.
+
+## Changelog
+For a detailed history of changes and updates, please refer to the `CHANGELOG.md` file.
 
 ## Getting Started
 

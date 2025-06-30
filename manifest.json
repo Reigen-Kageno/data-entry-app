@@ -1,7 +1,8 @@
 {
-  "name": "Quarry Data Entry App",
-  "short_name": "Dotations Pout",
-  "start_url": ".",
+  "name": "SOECO Basalt Site Data Entry",
+  "short_name": "SOECO Data",
+  "description": "Suivre les opérations quotidiennes des machines et la consommation des ressources sur le site de basalte SOECO",
+  "lang": "fr",  "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2196f3",

@@ -1,59 +1,104 @@
 // c:\Users\DIA\Documents\soeco\data entry app\app.js
 
+// Global constants
+const RESOURCES = ['Gasoil', 'HuileMoteur', 'HuileHydraulique', 'HuileLubrification', 'HuileBoite', 'HuilePont', 'HuileDirection']; 
+const ZONES = ['Concassage', 'Extraction', 'Autres', 'BTC']; 
+
 // 1. Define the database
 const db = new Dexie("BasaltDataEntryDB");
 
+// --- Module-scoped UI elements and shared data ---
+// These variables will be assigned their DOM elements or initial values within initializeAppUI
+// and will be accessible by all functions within this module.
+let dateInput;
+let machineList;
+let machinesContainer;
+let addMachineBtn;
+let resourceStockCardsContainer;
+let entryForm;
+let saveBtn;
+let editBtn;
+let generalNotesInput;
+let syncStatusElement;
+let machineOptions = []; // This array holds the machine options for datalists
+let dailyStockCheckOverrides = {}; // Stores stock check overrides for the current date
+const selectedMachines = new Set(); // Tracks selected machines for the current date
+const machineResourceSets = new Map(); // Map of machine elements to their selected resources
+
 // 2. Define the schema (tables and their indexes)
 // Bump the version number when schema changes
-db.version(6).stores({
-  formEntries: '++id, date, syncStatus, machine, resource, quantity',
-  stockChecks: '[resourceName+date], resourceName, date, quantityOnHand, syncStatus'
+db.version(13).stores({
+  formEntries: '++id, date, syncStatus, machine, zoneActivite, resource, quantity, compteurMoteurDebut, compteurMoteurFin, sharepointId, notes',
+  stockChecks: '[resourceName+date], resourceName, date, quantityOnHand, syncStatus, sharepointId',
+  machines: '++id, sharepointId, displayName, idMachine, location, machineType, active'
 }).upgrade(async (tx) => {
-  console.log("!!! EXECUTING UPGRADE TO DATABASE VERSION 6 !!!");
-  console.log("Converting all sync tracking to numeric syncStatus (0 = not synced, 1 = synced)...");
-  
-  // Get all records
-  const stockChecks = await tx.table('stockChecks').toArray();
-  
-  // Clear and re-create with new schema
-  await tx.table('stockChecks').clear();
-  
-  // Convert and reinsert records
-  for (const check of stockChecks) {
-    const { synced, ...rest } = check;
-    await tx.table('stockChecks').add({
-      ...rest,
-      syncStatus: synced ? 1 : 0
-    });
+  console.log("Upgrading to database version 13");
+  try {
+    // Get all records that need syncStatus conversion
+    const stockChecks = await tx.table('stockChecks').toArray();
+    
+    // Clear and re-create stockChecks with new schema
+    await tx.table('stockChecks').clear();
+    
+    // Convert and reinsert records with numeric syncStatus
+    for (const check of stockChecks) {
+      try {
+        const { synced, ...rest } = check;
+        await tx.table('stockChecks').add({
+          ...rest,
+          syncStatus: synced ? 1 : 0
+        });
+      } catch (err) {
+        console.error('Error converting stockCheck record:', check, err);
+      }
+    }
+
+    console.log(`Converted ${stockChecks.length} stock check records`);
+  } catch (error) {
+    console.error('Error during database upgrade:', error);
+    throw error;
   }
+
+
 });
 
-// Wait for the DB to open (and the upgrade to run) before doing anything else:
-db.open()
-  .then(() => {
-    console.log("✅ Dexie DB open and migrated to latest version");
-    console.log("Dexie version:", Dexie.semVer);
-    console.log("Dexie supports boolean keys:", typeof Dexie.maxKey === 'undefined' || Dexie.maxKey === true);
-    
-    console.log("DB Schema as seen by Dexie:", db.tables.map(table => ({
-      name: table.name,
-      schema: table.schema.indexes.map(idx => ({
-        name: idx.name,
-        keyPath: idx.keyPath,
-        multiEntry: idx.multiEntry,
-        unique: idx.unique
-      }))
-    })));
-    // Now it's safe to wire up your sync button:
-    document
-      .getElementById('manual-sync-btn')
-      .addEventListener('click', () => syncQueuedEntries(true, true));
-    // Initialize the UI and load initial data
-    initializeAppUI();
-  })
-  .catch(err => console.error("Failed to open DB:", err));
+import MasterDataManager from './masterData.js';
+import { getToken, setAuthSuccessCallback, msalInstance } from './auth.js';
+import config from './config.global.js';
 
-console.log("Dexie DB initialized:", db.name);
+// Create master data manager instance
+const masterData = new MasterDataManager(db);
+
+/**
+ * This is the main initialization sequence for the application.
+ * It should only be called once authentication is confirmed.
+ */
+async function startApp() {
+  console.log("Starting application initialization...");
+  try {
+    // Show a loading indicator to the user
+    document.getElementById('syncStatus').textContent = 'Initializing application...';
+
+    await db.open();
+    console.log("✅ Dexie DB open and migrated to latest version");
+
+    // Initialize master data (which handles auth and fetches from SharePoint)
+    await masterData.initialize();
+    console.log("Master data initialized");
+
+    // Initialize the UI with the data
+    initializeAppUI();
+    console.log("Initial UI setup complete");
+
+    // Set up the manual sync button
+    document.getElementById('manual-sync-btn').addEventListener('click', () => syncQueuedEntries(true, true));
+
+  } catch (err) {
+    console.error("Fatal error during application startup:", err);
+    // Display a user-friendly error message on the screen
+    document.body.innerHTML = `<h1>Error</h1><p>Could not start the application. Please check the console for details.</p><p>${err.message}</p>`;
+  }
+}
 
 // --- Basic CRUD Operations ---
 
@@ -93,7 +138,7 @@ async function updateEntryStatus(id, isSynced) {
   try {
     const count = await db.formEntries.update(id, { syncStatus: isSynced ? 1 : 0 });
     if (count) {
-      console.log(`Entry ${id} status updated to ${syncStatus}`);
+      console.log(`Entry ${id} status updated to ${isSynced ? 1 : 0}`);
     } else {
       console.log(`Entry ${id} not found for update.`);
     }
@@ -139,7 +184,7 @@ async function saveStockCheck(stockCheckData) {
       console.error("Invalid stockCheckData:", stockCheckData);
       throw new Error("Attempted to save invalid stock check data.");
     }
-    await db.stockChecks.add({
+    await db.stockChecks.put({
       ...stockCheckData,
       syncStatus: 0    // 0 = not synced, 1 = synced
     });
@@ -170,48 +215,29 @@ async function deleteEntriesByDate(dateString) {
     console.error(`Error deleting entries for date ${dateString}:`, error);
   }
 }
-// --- Example Usage (you'll integrate this with your form submission logic) ---
-// This is just for demonstration. You'll call these from your event handlers.
-
-// async function demoDexie() {
-//   const newEntry = {
-//     date: new Date().toISOString().split('T')[0],
-//     site: 'Main Site',
-//     machineName: 'Excavator ZX200',
-//     hours: 8,
-//     fuel: 150,
-//     operator: 'John Doe',
-//     notes: 'Routine check, all good.',
-//     status: 'queued' // Important for sync logic
-//   };
-//   const entryId = await addFormEntry(newEntry);
-
-//   if (entryId) {
-//     await getQueuedEntries();
-//     await updateEntryStatus(entryId, 'synced');
-//     await getQueuedEntries(); // Should be empty or one less
-//     // await deleteEntry(entryId); // Or delete after sync
-//   }
-// }
-// demoDexie(); // Call this to test if you like
 
 // --- Sync Logic ---
-const SYNC_ENDPOINT_URL = window.SYNC_ENDPOINT_URL; // Adjust the import path as needed
-
 async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
-  if (!navigator.onLine) {
-    console.log("Offline. Sync deferred.");
-    // Optionally, update UI to show offline status
-    updateSyncStatusUI(false, 'Offline. Entries are queued.');
-    return;
-  }
+    if (!navigator.onLine) {
+        console.log("Offline. Sync deferred.");
+        updateSyncStatusUI(false, 'Offline. Entries are queued.');
+        return;
+    }
 
-  console.log("Online. Attempting to sync entries...");
-  if (showStatus) updateSyncStatusUI(true, manualTrigger ? 'Manual Sync: Syncing...' : 'Syncing...');
-  let queuedEntries = [];
-  let queuedStockChecks = [];
+    try {
+    let token = await getToken();
+    if (!token) {
+      console.error("Failed to acquire authentication token");
+      updateSyncStatusUI(true, 'Authentication failed. Please try again.');
+      return;
+    }
 
-  try {
+    console.log("Online. Attempting to sync entries...");
+    if (showStatus) updateSyncStatusUI(true, manualTrigger ? 'Manual Sync: Syncing...' : 'Syncing...');
+    
+    let queuedEntries = [];
+    let queuedStockChecks = [];
+
     // Get all unsynced entries and stock checks
     queuedEntries = await getQueuedEntries();
     queuedStockChecks = await db.stockChecks.where('syncStatus').equals(0).toArray();
@@ -222,81 +248,129 @@ async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
       return;
     }
 
-    console.log(`Found ${queuedEntries.length} entries and ${queuedStockChecks.length} stock checks to sync.`);
-    if (showStatus) updateSyncStatusUI(true, `Syncing ${queuedEntries.length} entries and ${queuedStockChecks.length} stock checks...`);
+    // Sync form entries
+    for (const entry of queuedEntries) {
+      try {
+         const endpoint = `https://graph.microsoft.com/v1.0/sites/${config.sharePoint.siteId}/lists/${config.sharePoint.lists.formEntries}/items`;
+        const payload = {
+          fields: {
+            Title: `${entry.machine}-${entry.date}`,
+            Date: `${entry.date}T00:00:00Z`, // Use ISO 8601 with time for SharePoint
+            Machine: String(entry.machine),
+            Zoneactivit_x00e9_: String(entry.zoneActivite), // Corrected field name for SharePoint
+            Resource: String(entry.resource),
+            Quantity: String(entry.quantity),
+            CompteurMoteurDebut: String(entry.compteurMoteurDebut || 0),
+            CompteurMoteurFin: String(entry.compteurMoteurFin || 0),
+            Commentaire: String(entry.notes || '')
+          }
+        };
 
-    // Prepare the consolidated payload
-    const syncPayload = {
-      entries: queuedEntries.map(entry => {
-        const { id, status, ...data } = entry;
-        return data;
-      }),
-      stockChecks: queuedStockChecks.map(check => {
-        const { syncStatus, ...data } = check;
-        return data;
-      })
-    };
+        // If we have a SharePoint ID, update existing item
+        if (entry.sharepointId) {
+          const response = await fetch(`${endpoint}/${entry.sharepointId}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
 
-    // Send everything in one request
-    const response = await fetch(SYNC_ENDPOINT_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(syncPayload),
-    });
+          if (response.ok) {
+            await updateEntryStatus(entry.id, true);
+          }
+        } else {
+          // Create new item
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
 
-    let responseData;
-    try {
-      responseData = await response.json();
-    } catch (e) {
-      responseData = null;
+          if (response.ok) {
+            const data = await response.json();
+            // Update local entry with SharePoint ID and mark as synced
+            await db.formEntries.update(entry.id, {
+              sharepointId: data.id,
+              syncStatus: 1
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Failed to sync entry ${entry.id}:`, error);
+      }
     }
 
-    if (response.ok) {
-      // Update local sync status for all successfully synced items
-      for (const entry of queuedEntries) {
-        await updateEntryStatus(entry.id, true);
-      }
+    // Sync stock checks
+    for (const check of queuedStockChecks) {
+      try {
+        const endpoint = `https://graph.microsoft.com/v1.0/sites/${config.sharePoint.siteId}/lists/${config.sharePoint.lists.stockChecks}/items`;
+        const payload = {
+          fields: {
+            Title: `${check.resourceName}-${check.date}`,
+            Date: `${check.date}T00:00:00Z`,
+            ResourceName: String(check.resourceName),
+            QuantityOnHand: String(check.quantityOnHand)
+          }
+        };
 
-      for (const check of queuedStockChecks) {
-        if (check.resourceName && check.date) {
-          await db.stockChecks.update(
-            [check.resourceName, check.date],
-            { syncStatus: 1 }
-          );
+        if (check.sharepointId) {
+          const response = await fetch(`${endpoint}/${check.sharepointId}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            await db.stockChecks.update(
+              [check.resourceName, check.date],
+              { syncStatus: 1 }
+            );
+          }
+        } else {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            await db.stockChecks.update(
+              [check.resourceName, check.date],
+              {
+                sharepointId: data.id,
+                syncStatus: 1
+              }
+            );
+          }
         }
+      } catch (error) {
+        console.error(`Failed to sync stock check ${check.resourceName}-${check.date}:`, error);
       }
+    }
 
-      console.log('All data synced successfully');
-      if (showStatus) updateSyncStatusUI(true, 'Sync completed successfully');
-
+    // Final status update
+    const remainingEntries = await getQueuedEntries();
+    const remainingStockChecks = await db.stockChecks.where('syncStatus').equals(0).toArray();
+    
+    if (remainingEntries.length > 0 || remainingStockChecks.length > 0) {
+      const msg = `Sync attempted. ${remainingEntries.length} entries and ${remainingStockChecks.length} stock checks still queued.`;
+      console.log(msg);
+      updateSyncStatusUI(true, msg);
     } else {
-      // Handle different error status codes
-      let errorMessage = '';
-      switch (response.status) {
-        case 400:
-          errorMessage = 'Invalid data format. Please check your entries.';
-          console.error('Sync failed - Invalid data:', responseData?.error || response.statusText);
-          break;
-        case 401:
-          errorMessage = 'Authentication failed. You may need to log in again.';
-          console.error('Sync failed - Authentication error:', response.statusText);
-          break;
-        case 403:
-          errorMessage = 'You do not have permission to sync this data.';
-          break;
-        default:
-          errorMessage = `Server error (${response.status}). Please try again later.`;
-      }
-
-      if (responseData?.error) {
-        errorMessage += ` Details: ${responseData.error}`;
-      }
-
-      console.error('Sync error:', errorMessage);
-      if (showStatus) updateSyncStatusUI(true, `Sync failed: ${errorMessage}`);
-      return; // Exit on error
+      console.log(manualTrigger ? "Manual Sync: All data synced." : "All data synced.");
+      updateSyncStatusUI(true, 'Sync complete. All data synced.');
     }
 
   } catch (error) {
@@ -304,27 +378,22 @@ async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
     if (showStatus) updateSyncStatusUI(true, `Sync failed: ${error.message}`);
     return;
   }
-  // Check remaining unsynced items
-  const remainingEntries = await getQueuedEntries();
-  const remainingStockChecks = await db.stockChecks.where('syncStatus').equals(0).toArray();
-  
-  if (remainingEntries.length > 0 || remainingStockChecks.length > 0) {
-    const msg = `Sync attempted. ${remainingEntries.length} entries and ${remainingStockChecks.length} stock checks still queued.`;
-    console.log(msg);
-    updateSyncStatusUI(true, msg);
-  } else {
-    console.log(manualTrigger ? "Manual Sync: All data synced." : "All data synced.");
-    updateSyncStatusUI(true, 'Sync complete. All data synced.');
-  }
 }
 
 // --- Event Listeners for Online/Offline Status ---
 // window.addEventListener('online', syncQueuedEntries); // Removed automatic sync on online event
 
 window.addEventListener('offline', () => {
-  console.log("Application is now offline.");
-  updateSyncStatusUI(false, 'Offline. Entries will be queued.', false); // Pass false for isOnline
-  updateSyncButtonState(); // Update button state
+    console.log("Application is now offline.");
+    updateSyncStatusUI(false, 'Offline. Entries will be queued.', false); // Pass false for isOnline
+    updateSyncButtonState(); // Update button state
+});
+
+// Handle when app comes back online
+window.addEventListener('online', () => {
+    console.log("Application is now online.");
+    updateSyncStatusUI(true, 'Online. Ready to sync.', true);
+    updateSyncButtonState();
 });
 
 // --- UI Update for Sync Status (Placeholder) ---
@@ -348,42 +417,169 @@ function updateSyncButtonState() {
   }
 }
 
-// This function will be called after Dexie is ready
+// Initialize App UI
 function initializeAppUI() {
     console.log("DB is ready. Initializing UI.");
+    
+    // --- DOM Element Selections (assign to module-scoped variables) ---
+    dateInput = document.getElementById('entry-date');
+    machineList = document.getElementById('machine-list');
+    machinesContainer = document.getElementById('machines-container');
+    addMachineBtn = document.getElementById('add-machine');
+    resourceStockCardsContainer = document.getElementById('resource-stock-cards-container');
+    entryForm = document.getElementById('entry-form');
+    saveBtn = document.getElementById('save-entries-btn');
+    editBtn = document.getElementById('edit-entries-btn');
+    generalNotesInput = document.getElementById('general-notes');
+    syncStatusElement = document.getElementById('syncStatus');
+    
+    const DEFAULT_FALLBACK_MACHINES = ['EXC-300', 'BULL-24', 'CRANE-12'];
+    async function loadMachineOptions() {
+        try {
+            console.log('Loading active machines from MasterData...');
+            // Get machines from MasterDataManager (which holds cached/refreshed list)
+            const allMasterDataMachines = masterData.getMachines(false); // Get all, active or not
+            const activeMasterDataMachines = masterData.getMachines(true); // Get only active
 
-    // --- Global-like variables for UI logic --- 
-    const machineOptions = ['FOREUSE FURUKAWA', 'PEL17', 'PEL18', 'CA55', 'CA62', 'CA57', 'CA60', 'GE A Diagne', 'Motopompe', 'Concasseur primaire', 'VHL62', 'VHL21', 'VHL36', 'VHL52', 'DG', 'Livraison', 'LT106', 'LT200', 'HP300', 'BULLDOZER', 'CHA12', 'CHA08', 'GE32 CHINOIS', 'GE35 HIMONSA', 'GE47 CUMMINS', 'GE29 CUMMINS', 'GE A Diagne', 'Convoyeur C1', 'Convoyeur C2', 'Convoyeur C3', 'Convoyeur C4', 'Convoyeur C5', 'Convoyeur C6', 'Convoyeur C6 bis', 'Convoyeur C6 ter', 'Convoyeur C7', 'Convoyeur C8', 'Convoyeur C9', 'Convoyeur C10', 'Convoyeur C11', 'CRIBLE N°1', 'CRIBLE N°2'];
-    const resources = ['Gasoil', 'HuileMoteur', 'HuileHydraulique', 'HuileLubrification', 'HuileBoite', 'HuilePont', 'HuileDirection'];
-    let dailyStockCheckOverrides = {}; // Store for today's stock check overrides. Key: date -> resourceName -> quantityOnHand
+            console.log('Total machines from MasterData:', allMasterDataMachines.length);
+            console.log('Active machines from MasterData:', activeMasterDataMachines.length);
+             // Use idMachine for the dropdown values, as this is used for lookups
+            if (activeMasterDataMachines.length > 0) {
+                machineOptions = activeMasterDataMachines.map(m => m.idMachine);
+            } else if (allMasterDataMachines.length > 0) {
+                console.warn('No active machines found in MasterData, using all machines for options.');
+                machineOptions = allMasterDataMachines.map(m => m.idMachine);
+            } else {
+                console.warn('No machines found in MasterData. Falling back to default options.');
+                machineOptions = [...DEFAULT_FALLBACK_MACHINES];
+            }
+            // Always add Livraison option
+            if (!machineOptions.includes('Livraison')) {
+                machineOptions.push('Livraison');
+            }
+            
+            console.log('Final machine options for datalist:', machineOptions);
+            updateMachineDatalist();
+            return activeMasterDataMachines.length > 0 ? activeMasterDataMachines : allMasterDataMachines;
+        } catch (error) {
+            console.error('Failed to load machines from MasterData (or error in try block):', error);
+            // Attempt to use masterData.machines directly if masterData.getMachines() failed 
+            // but masterData object and its cache exist
+            if (masterData && masterData.machines && masterData.machines.length > 0) {
+                console.warn('Falling back to masterData.machines internal cache due to error.');
+                const allCachedMachines = masterData.machines; // Already an array of machine objects
+                const activeCachedMachines = allCachedMachines.filter(m => m.active === 1);
+                if (activeCachedMachines.length > 0) {
+                    machineOptions = activeCachedMachines.map(m => m.idMachine);
+                } else { // If no active, use all from the internal cache
+                    machineOptions = allCachedMachines.map(m => m.idMachine);
+                }
+            } else {
+                // Ultimate fallback to hardcoded values if masterData or its cache is unavailable
+                console.warn('MasterData or its cache unavailable. Falling back to hardcoded machine options.');
+                machineOptions = [...DEFAULT_FALLBACK_MACHINES];
+            }
+            if (!machineOptions.includes('Livraison')) {
+                machineOptions.push('Livraison');
+            }
+            updateMachineDatalist();
+            return [];
+        }
+    }
 
-    // --- DOM Element Selections ---
-    const dateInput = document.getElementById('entry-date');
-    const machineList = document.getElementById('machine-list');
-    const machinesContainer = document.getElementById('machines-container');
-    const addMachineBtn = document.getElementById('add-machine');
-    const resourceStockCardsContainer = document.getElementById('resource-stock-cards-container');
-    const entryForm = document.getElementById('entry-form');
-    const saveBtn = document.getElementById('save-entries-btn');
-    const editBtn = document.getElementById('edit-entries-btn');
-    // manualSyncBtn is already handled in db.open().then()
-    const generalNotesInput = document.getElementById('general-notes');
-    const syncStatusElement = document.getElementById('syncStatus');
+    // Initial machine list load. `masterData.initialize()` has already run, loaded from cache,
+    // and attempted a single refresh from SharePoint if the app was online at startup.
+    // Now, we just need to populate the UI with the data that masterData has prepared.
+    console.log('initializeAppUI: Populating machine options from masterData.');
+    // loadMachineOptions will populate the UI based on masterData's current state.
+    loadMachineOptions(); 
 
+    // --- Original initializeAppUI code continues below ---
     // --- Helper Function Definitions (moved from inline script) ---
     function addMachineSection() {
         const clone = document.getElementById('machine-template').content.cloneNode(true);
         const section = clone.querySelector('.machine-section');
         const machineInput = section.querySelector('input[name="machine"]');
+        const machineDisplayName = section.querySelector('input[name="machine-display-name"]');
+        const zoneSelect = section.querySelector('select[name="zone-activite"]');
 
-        // Setup machine input handling
-        machineInput.addEventListener('change', () => {
-            const newMachineName = machineInput.value;
-            if (selectedMachines.has(newMachineName)) {
-                alert('This machine has already been added for today.');
+        // Populate zone dropdown
+        ZONES.forEach(zone => {
+            const option = document.createElement('option');
+            option.value = zone;
+            option.textContent = zone;
+            zoneSelect.appendChild(option);
+        });        // Setup machine input filtering and validation
+        machineInput.addEventListener('input', () => {
+            const value = machineInput.value.trim();
+            // Clear custom validity on input to allow real-time feedback
+            machineInput.setCustomValidity(''); 
+
+            // Basic pattern validation on input (optional, can be moved to change event)
+            const machinePattern = /^[A-Za-z0-9-]+$/;
+            if (value && !machinePattern.test(value) && value !== 'Livraison') {
+                machineInput.setCustomValidity('Veuillez entrer un ID de machine valide (alphanumérique et tirets uniquement).');
+            }
+            if (value) {
+                const matchingMachines = machineOptions.filter(m => 
+                    m && m.toLowerCase().startsWith(value.toLowerCase())
+                );
+                console.log('Matching machines:', matchingMachines);
+            }
+        });
+
+        // Handle machine selection
+        machineInput.addEventListener('change', async () => {
+            const newMachineName = machineInput.value.trim();
+
+              // Full pattern validation on change
+            const machinePattern = /^[A-Za-z0-9-]+$/;
+            if (!machinePattern.test(newMachineName) && newMachineName !== 'Livraison') {
+                machineInput.setCustomValidity('Veuillez entrer un ID de machine valide (alphanumérique et tirets uniquement).');
                 machineInput.value = '';
+                machineDisplayName.value = '';
                 return;
             }
+            
+            // Validate the machine name is from our list
+            const isValidMachine = newMachineName === 'Livraison' || 
+                                 machineOptions.includes(newMachineName);
+            
+            if (!isValidMachine) {
+                machineInput.setCustomValidity('Veuillez sélectionner une machine de la liste');
+                machineInput.value = '';
+                machineDisplayName.value = '';
+                return;
+            }
+            
+            if (selectedMachines.has(newMachineName)) {
+                machineInput.setCustomValidity('Cette machine a déjà été ajoutée pour aujourd\'hui');
+                alert('Cette machine a déjà été ajoutée pour aujourd\'hui.');
+                machineInput.value = '';
+                machineDisplayName.value = '';
+                return;
+            } else {
+                machineInput.setCustomValidity('');
+            }
+
+            // Look up machine display name
+            if (newMachineName && newMachineName !== 'Livraison') {
+                const machine = await db.machines
+                    .where('idMachine')
+                    .equals(newMachineName)
+                    .first();
+                
+                if (machine) {
+                    machineDisplayName.value = machine.displayName || machine.idMachine;
+                } else {
+                    machineDisplayName.value = newMachineName;
+                }
+            } else if (newMachineName === 'Livraison') {
+                machineDisplayName.value = 'Livraison';
+            } else {
+                machineDisplayName.value = '';
+            }
+
             trackMachineSelection(section, newMachineName);
         });
 
@@ -434,29 +630,46 @@ function initializeAppUI() {
     }
 
     function setFormEditable(isEditable) {
-        document.querySelectorAll('#entry-form input, #entry-form select, #entry-form textarea, #general-notes').forEach(el => {
-            if (el.id === 'entry-date') {
-                el.readOnly = false;
-                el.disabled = false;
-            } else {
-                el.readOnly = !isEditable;
-                el.disabled = !isEditable;
-            }
-        });
-        document.querySelectorAll('.stock-card').forEach(card => {
-            isEditable ? card.classList.remove('disabled') : card.classList.add('disabled');
-        });
-        document.querySelectorAll('.add-resource, .remove-resource, .remove-delivery').forEach(btn => {
-            btn.style.display = isEditable ? '' : 'none';
-        });
-        addMachineBtn.style.display = isEditable ? '' : 'none';
-        saveBtn.style.display = isEditable ? '' : 'none';
-        saveBtn.textContent = isEditable ? (editBtn.style.display === 'none' ? 'Save All Entries' : 'Update Entries') : 'Save All Entries';
-        editBtn.style.display = isEditable ? 'none' : '';
-        updateSyncButtonState();
-    }
+        // First check if any entries are already synced
+        const currentDate = document.getElementById('entry-date').value;
+          getEntriesByDate(currentDate).then(async entries => {
+            const hasSyncedEntries = entries.some(entry => entry.syncStatus === 1);
+            
+            // Check if any resources have synced stock checks
 
-    async function updateCardStockDisplay(resourceName, forDate) {
+            document.querySelectorAll('#entry-form input, #entry-form select, #entry-form textarea, #general-notes')
+                .forEach(el => {
+                    if (el.id === 'entry-date') {
+                        el.readOnly = false;
+                        el.disabled = false;
+                    } else {
+                        el.readOnly = !isEditable;
+                        el.disabled = !isEditable;
+                    }
+                });
+                document.querySelectorAll('.stock-card').forEach(card => {
+                    isEditable ? card.classList.remove('disabled') : card.classList.add('disabled');
+                });
+                document.querySelectorAll('.add-resource, .remove-resource, .remove-delivery').forEach(btn => {
+                    btn.style.display = isEditable ? '' : 'none';
+                });
+                addMachineBtn.style.display = isEditable ? '' : 'none';
+                saveBtn.style.display = isEditable ? '' : 'none';
+                saveBtn.textContent = isEditable ? (editBtn.style.display === 'none' ? 'Save All Entries' : 'Update Entries') : 'Save All Entries';
+                editBtn.style.display = isEditable ? 'none' : '';
+                updateSyncButtonState();
+                
+                // Always re-enable the date picker
+                const dateInput = document.getElementById('entry-date');
+                if (dateInput) {
+                    dateInput.readOnly = false;
+                    dateInput.disabled = false;
+                    dateInput.classList.remove('disabled');
+                }
+            }); 
+        } 
+
+    const updateCardStockDisplay = async function(resourceName, forDate) {
         const cardElement = resourceStockCardsContainer.querySelector(`.stock-card[data-resource="${resourceName}"]`);
         if (!cardElement) return;
 
@@ -541,16 +754,27 @@ function initializeAppUI() {
         if (deltaEl) deltaEl.textContent = `Δ Today: +${sumDeliveriesToday.toFixed(1)} | -${sumUsagesToday.toFixed(1)}`;
     }
 
-    async function handleSaveStockCheck(resourceName, cardElement, quantityOnHandFromPrompt) {
+    async function handleSaveStockCheck(resourceName, cardElement, quantityOnHand) {
         const forDate = dateInput.value;
-        if (isNaN(quantityOnHandFromPrompt)) return;
+        if (isNaN(quantityOnHand)) return;
 
-        await saveStockCheck({ resourceName, date: forDate, quantityOnHand: quantityOnHandFromPrompt, syncStatus: 0 });
+        // Fetch the existing record to preserve its sharepointId
+        const existingCheck = await db.stockChecks.get([resourceName, forDate]);
+
+        const stockCheckData = {
+            resourceName: resourceName,
+            date: forDate,
+            quantityOnHand: quantityOnHand,
+            syncStatus: 0, // Mark as unsynced for the next sync operation
+            sharepointId: existingCheck ? existingCheck.sharepointId : undefined
+        };
+
+        await saveStockCheck(stockCheckData);
         if (!dailyStockCheckOverrides[forDate]) dailyStockCheckOverrides[forDate] = {};
-        dailyStockCheckOverrides[forDate][resourceName] = quantityOnHandFromPrompt;
+        dailyStockCheckOverrides[forDate][resourceName] = quantityOnHand;
 
         await updateCardStockDisplay(resourceName, forDate);
-        alert(`Stock check for ${resourceName} on ${forDate} saved: ${quantityOnHandFromPrompt}.`);
+        alert(`Stock check for ${resourceName} on ${forDate} saved: ${quantityOnHand}.`);
     }
 
     function promptForMeasuredStock(resourceName, cardElement) {
@@ -566,7 +790,7 @@ function initializeAppUI() {
         if (isNaN(quantityOnHand)) {
             alert('Please enter a valid number for measured stock.');
             return;
-        }
+        }        // Use the compound key for the update
         handleSaveStockCheck(resourceName, cardElement, quantityOnHand);
     }
 
@@ -581,18 +805,52 @@ function initializeAppUI() {
         const entries = await getEntriesByDate(dateString);
 
         if (entries && entries.length > 0) {
+          const uiMachineSections = new Map(); // Use a map to track UI sections for each machine
             if(syncStatusElement) syncStatusElement.textContent = `Displaying ${entries.length} saved entries for ${dateString}.`;
             let notesLoaded = false;
             entries.forEach(entry => {
-                let machineSection = Array.from(machinesContainer.querySelectorAll('.machine-section'))
-                    .find(ms => ms.querySelector('input[name="machine"]').value === entry.machine);
+                let machineSection = uiMachineSections.get(entry.machine);
                 if (!machineSection) {
                     machineSection = addMachineSection();
+                    uiMachineSections.set(entry.machine, machineSection);
                     const machineInput = machineSection.querySelector('input[name="machine"]');
                     machineInput.value = entry.machine;
                     trackMachineSelection(machineSection, entry.machine);
+                    
+                    // Set zone activité if it exists
+                    const zoneSelect = machineSection.querySelector('select[name="zone-activite"]');
+                    if (zoneSelect && entry.zoneActivite) {
+                        zoneSelect.value = entry.zoneActivite;
+                    }
+                    
+                    // Set notes if they exist
                     if (entry.notes && machineSection.querySelector('textarea[name="machine-notes"]')) {
                         machineSection.querySelector('textarea[name="machine-notes"]').value = entry.notes;
+                    }
+                    
+                    // Set machine display name
+                    const machineDisplayName = machineSection.querySelector('input[name="machine-display-name"]');
+                    if (machineDisplayName) {
+                        if (entry.machine === 'Livraison') {
+                            machineDisplayName.value = 'Livraison';
+                        } else {
+                             const machineData = masterData.findMachineByIdMachine(entry.machine);
+                            if (machineData) {
+                                machineDisplayName.value = machineData.displayName || machineData.idMachine;
+                            } else {
+                                machineDisplayName.value = entry.machine;
+                            }
+                        }
+                    }
+                    
+                    // Set mileage readings if they exist
+                    const compteurDebutInput = machineSection.querySelector('input[name="compteurMoteurDebut"]');
+                    const compteurFinInput = machineSection.querySelector('input[name="compteurMoteurFin"]');
+                    if (compteurDebutInput && entry.compteurMoteurDebut !== undefined) {
+                        compteurDebutInput.value = entry.compteurMoteurDebut;
+                    }
+                    if (compteurFinInput && entry.compteurMoteurFin !== undefined) {
+                        compteurFinInput.value = entry.compteurMoteurFin;
                     }
                 }
                 const resourceRow = addResourceRow(machineSection);
@@ -617,9 +875,8 @@ function initializeAppUI() {
             });
             setFormEditable(false);
             saveBtn.textContent = 'Save All Entries';
-           
         } else {
-            if(syncStatusElement) syncStatusElement.textContent = `No entries found for ${dateString}. Ready for new input.`;
+            if(syncStatusElement) syncStatusElement.textContent = `Pas de données pour ${dateString}. Prêt pour une nouvelle saisie.`;
             addMachineSection();
             setFormEditable(true);
             saveBtn.textContent = 'Save All Entries';
@@ -627,7 +884,7 @@ function initializeAppUI() {
 
         // After populating form or setting to new entry mode, update all card stock displays
         // This is now partly handled by clearAllFormEntries, but a final pass ensures consistency.
-        for (const resource of resources) {
+        for (const resource of RESOURCES) {
             await updateCardStockDisplay(resource, dateString);
         }
     }
@@ -638,7 +895,7 @@ function initializeAppUI() {
         // When clearing form, also update stock display as net movements from form are now 0
         // This needs to be async if updateCardStockDisplay is async
         const currentDate = dateInput.value;
-        resources.forEach(r => {
+        RESOURCES.forEach(r => {
             updateCardStockDisplay(r, currentDate); // This is async, but forEach won't wait.
                                                     // For UI updates, this might be fine. If strict order needed, use for...of with await.
         });
@@ -671,12 +928,9 @@ function initializeAppUI() {
         });
 
         return totalNet;
-    }
+    }    // --- Duplicate Prevention System ---
 
-    // --- Duplicate Prevention System ---
-    const selectedMachines = new Set(); // Track selected machines for the current date
-    const machineResourceSets = new Map(); // Map of machine elements to their selected resources
-
+    
     function getAvailableMachines() {
         return machineOptions.filter(m => !selectedMachines.has(m));
     }    function getAvailableResourcesForMachine(machineSection) {
@@ -699,7 +953,7 @@ function initializeAppUI() {
         selectedResources.forEach(r => resourceSet.add(r));
         
         // Return resources that aren't currently selected in this machine
-        return resources.filter(r => !selectedResources.has(r));
+        return RESOURCES.filter(r => !selectedResources.has(r));
     }
 
     function updateMachineDatalist() {
@@ -762,16 +1016,15 @@ function initializeAppUI() {
         // Update the tracked set
         resourceSet.clear();
         currentSelections.forEach(r => resourceSet.add(r));
-    }
-
-    function untrackMachine(machineSection) {
+    }    function untrackMachine(machineSection) {
         const machineName = machineSection.querySelector('input[name="machine"]').value;
-        selectedMachines.delete(machineName);
-        machineResourceSets.delete(machineSection);
-        updateMachineDatalist();
-    }
-
-    function untrackResource(machineSection, resourceRow) {
+        if (machineName) {
+            console.log('Untracking machine:', machineName);
+            selectedMachines.delete(machineName);
+            machineResourceSets.delete(machineSection);
+            updateMachineDatalist();
+        }
+    }function untrackResource(machineSection, resourceRow) {
         const resourceName = resourceRow.querySelector('select[name="resource"]').value;
         const resourceSet = machineResourceSets.get(machineSection);
         if (resourceSet) {
@@ -788,19 +1041,30 @@ function initializeAppUI() {
 
     // --- Initial Setup and Event Listeners ---
 
-    // Prepopulate date
-    dateInput.valueAsDate = new Date();
-
-    // Populate machine datalist
-    machineOptions.forEach(m => {
-        const opt = document.createElement('option'); opt.value = m; machineList.appendChild(opt);
-    });
+    // Make sure dateInput exists before using it
+    if (dateInput) {
+        // Prepopulate date
+        dateInput.valueAsDate = new Date();
+    } else {
+        console.error('Date input element not found');
+    }    // Populate machine datalist if it exists
+    if (machineList && Array.isArray(machineOptions)) {
+        machineOptions.forEach(m => {
+            if (m) {  // Only add if machine name is valid
+                const opt = document.createElement('option');
+                opt.value = m;
+                machineList.appendChild(opt);
+            }
+        });
+    } else {
+        console.error('Machine list element or options not properly initialized');
+    }
 
     // Setup machines
     addMachineBtn.onclick = addMachineSection;
 
     // Resource Stock Cards Setup
-    resources.forEach(r => {
+    RESOURCES.forEach(r => {
         const card = document.createElement('div');
         card.className = 'stock-card';
         card.dataset.resource = r;
@@ -821,63 +1085,79 @@ function initializeAppUI() {
         resourceStockCardsContainer.appendChild(card);
     });
 
+
+    // Edit Button Click Listener
+    editBtn.addEventListener('click', async () => {
+        const currentDate = dateInput.value;
+        // Check if any data for this date has already been synced
+        const formEntries = await getEntriesByDate(currentDate);
+        const stockChecks = await db.stockChecks.where({ date: currentDate }).toArray();
+        const hasSyncedData = formEntries.some(e => e.syncStatus === 1) || stockChecks.some(s => s.syncStatus === 1);
+
+        if (hasSyncedData) {
+            if (!confirm('Données déjà synchronisées. Êtes-vous sûr de vouloir les modifier ?')) {
+                return; // User cancelled, do nothing.
+            }
+        }
+
+        // Proceed with making the form editable
+        setFormEditable(true);
+        saveBtn.textContent = 'Update Entries';
+        if (syncStatusElement) syncStatusElement.textContent = 'Form is now editable for update.';
+    });
+
     // Form Submit Handler
     entryForm.addEventListener('submit', async e => {
         e.preventDefault();
         const entryDateValue = dateInput.value;
         const generalNotes = generalNotesInput.value || '';
-        let entriesSavedCount = 0;
+        let entriesProcessedCount = 0;
 
-        await deleteEntriesByDate(entryDateValue);
+        // 1. Fetch existing entries for the current date to compare against
+        const existingEntries = await getEntriesByDate(entryDateValue);
+        const existingEntryMap = new Map(existingEntries.map(e => [`${e.machine}-${e.resource}`, e]));
+        const entriesToKeep = new Set(); // To track which existing entries are still valid
 
         const machineSections = machinesContainer.querySelectorAll('.machine-section');
         for (const section of machineSections) {
             const machineName = section.querySelector('input[name="machine"]').value;
+            const zoneActivite = section.querySelector('select[name="zone-activite"]').value;
             const machineNotes = section.querySelector('textarea[name="machine-notes"]')?.value || '';
             const resourceRows = section.querySelectorAll('.resource-row');
+
+            const compteurDebut = parseFloat(section.querySelector('input[name="compteurMoteurDebut"]')?.value || '0');
+            const compteurFin = parseFloat(section.querySelector('input[name="compteurMoteurFin"]')?.value || '0');
 
             for (const row of resourceRows) {
                 const resource = row.querySelector('select[name="resource"]').value;
                 const quantity = parseFloat(row.querySelector('input[name="quantity"]').value);
-                let actualMachineName = machineName;
 
-                if (machineName.toLowerCase().trim().startsWith('livraison')) {
-                    actualMachineName = 'Livraison';
-                    const originalMachineLower = machineName.toLowerCase().trim();
-                    const resourceLower = resource.toLowerCase();
-                    if (originalMachineLower !== 'livraison' && !originalMachineLower.includes(resourceLower)) {
-                        continue;
-                    }
-                }                const usageEntryData = {
-                    date: entryDateValue,
-                    machine: actualMachineName,
-                    resource: resource,
-                    quantity: quantity,
-                    notes: `${generalNotes} ${machineNotes}`.trim(),
-                    syncStatus: 0 // 0 = not synced
-                };
-                if (!isNaN(quantity) && quantity > 0 && machineName) {
-                    await addFormEntry(usageEntryData);
-                    entriesSavedCount++;
+                if (isNaN(quantity) || quantity <= 0 || !machineName || !resource) {
+                    continue;
                 }
-            }
-        }
-        if (entriesSavedCount > 0) {
-            if(syncStatusElement) syncStatusElement.textContent = `${entriesSavedCount} entries saved/updated locally and queued for sync.`;
-            await loadEntriesForDate(entryDateValue);
-        } else {
-            if(syncStatusElement) syncStatusElement.textContent = 'No new entries to save.';
-            if (await getEntriesByDate(entryDateValue).then(e => e.length === 0)) {
-                await loadEntriesForDate(entryDateValue);
-            }
-        }
-    });
 
-    // Edit Button Listener
-    editBtn.addEventListener('click', () => {
-        setFormEditable(true);
-        saveBtn.textContent = 'Update Entries';
-        if(syncStatusElement) syncStatusElement.textContent = 'Form is now editable for update.';
+                const newEntryData = { date: entryDateValue, machine: machineName, zoneActivite, resource, quantity, compteurMoteurDebut: compteurDebut, compteurMoteurFin: compteurFin, notes: `${generalNotes} ${machineNotes}`.trim() };
+                const existingEntry = existingEntryMap.get(`${newEntryData.machine}-${newEntryData.resource}`);
+
+                if (existingEntry) {
+                    await db.formEntries.update(existingEntry.id, { ...newEntryData, sharepointId: existingEntry.sharepointId, syncStatus: 0 });
+                    entriesToKeep.add(existingEntry.id);
+                } else {
+                    const newId = await db.formEntries.add({ ...newEntryData, syncStatus: 0 });
+                    entriesToKeep.add(newId);
+                }
+                entriesProcessedCount++;
+            }
+        }
+
+        for (const oldEntry of existingEntries) {
+            if (!entriesToKeep.has(oldEntry.id)) {
+                await db.formEntries.delete(oldEntry.id);
+            }
+        }
+
+        if (syncStatusElement) syncStatusElement.textContent = `${entriesProcessedCount} entries saved/updated locally and queued for sync.`;
+        await loadEntriesForDate(entryDateValue);
     });
 
     // Date Input Change Listener
@@ -910,4 +1190,24 @@ function initializeAppUI() {
                 .catch(err => console.error('Service Worker: Registration Error', err));
         });
     }
+    
 }
+
+// --- Application Entry Point ---
+
+// 1. Set the callback that auth.js will trigger after a successful redirect login.
+setAuthSuccessCallback(startApp);
+
+// 2. Check the auth state.
+// `handleRedirectPromise` is called by auth.js when it's loaded.
+// We just need to decide if we should start the app now or wait for the redirect.
+if (msalInstance.getAllAccounts().length > 0) {
+  // If we already have an account, start the app.
+  startApp();
+} else if (!window.location.hash.includes('code=')) {
+  // If we don't have an account and we are not in a redirect, trigger the login.
+  // The app will be started by the callback after the redirect.
+  document.getElementById('syncStatus').textContent = 'Redirecting to login...';
+  getToken();
+}
+// If we are in a redirect (hash contains 'code='), auth.js will handle it and call our callback.

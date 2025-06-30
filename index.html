@@ -1,9 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Basalt Site Data Entry</title>
+  <meta name="description" content="Application de saisie des données pour le site de basalte SOECO - Suivi quotidien des opérations des machines et de la consommation des ressources">
+  <meta name="theme-color" content="#2196f3">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>SOECO - Saisie des Données</title>
   <!-- PWA Manifest -->
   <link rel="manifest" href="manifest.json">
   <!-- Favicon -->
@@ -24,14 +28,44 @@
     .stock-card.disabled:hover { background: none; } /* Prevent hover effect when disabled */
     .stock-card .badge { position: absolute; top: -6px; right: -6px; background: red; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.8em; }
     .stock-card:hover { background: #f0f0f0; }
-  </style>
-   <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
-  <!-- <meta http-equiv="Content-Security-Policy"
-  <script>/* content="default-src 'self';
-           script-src 'self';
-           connect-src 'self' https://prod-117.westeurope.logic.azure.com;
-           img-src 'self';
-           style-src 'self' 'unsafe-inline';"> -->
+  </style>  
+  
+  <!-- Load MSAL first -->
+  <script src="https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js"></script>
+  
+  <!-- Then load Dexie -->
+  <script src="https://unpkg.com/dexie@latest/dist/dexie.js"></script>
+  
+  <!-- Debug tools -->
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+
+  <!-- Wait for DOM content to be loaded before loading app modules -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Verify MSAL is loaded
+      if (typeof msal === 'undefined') {
+        console.error('MSAL failed to load');
+        document.getElementById('syncStatus').textContent = 'Error: Authentication library failed to load';
+        return;
+      }
+      
+      // Load application modules
+      const auth = document.createElement('script');
+      auth.type = 'module';
+      auth.src = 'auth.js';
+      document.head.appendChild(auth);
+
+      const masterData = document.createElement('script');
+      masterData.type = 'module';
+      masterData.src = 'masterData.js';
+      document.head.appendChild(masterData);
+
+      const app = document.createElement('script');
+      app.type = 'module';
+      app.src = 'app.js';
+      document.head.appendChild(app);
+    });
+  </script>
 </head>
 <body>
   <h2>Daily Entry</h2>
@@ -53,10 +87,31 @@
   </form>
   <!-- This p#status will be used by app.js as syncStatus -->
   <p id="syncStatus">Loading status...</p>
-
   <template id="machine-template">
     <div class="machine-section">
-      <label>Machine: <input name="machine" list="machine-list" required></label>
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">        <label style="flex: 1;">
+          Machine ID: 
+          <input name="machine" 
+                 list="machine-list"
+                 required
+                 style="width: 100%;"
+                 autocomplete="off"
+                 title="Veuillez sélectionner une machine de la liste">
+        </label>
+        <label style="flex: 1;">
+          Nom Machine: 
+          <input name="machine-display-name" readonly style="width: 100%; background-color: #f5f5f5;">
+        </label>
+      </div>
+      <label style="display: block; margin-bottom: 10px;">Zone Activité: 
+        <select name="zone-activite" required style="width: 200px;">
+          <option value="">-- Sélectionner une zone --</option>
+        </select>
+      </label>
+      <div class="machine-meter">
+        <label>Compteur Moteur Début: <input name="compteurMoteurDebut" type="number" step="0.1"></label>
+        <label style="margin-left: 10px;">Fin: <input name="compteurMoteurFin" type="number" step="0.1"></label>
+      </div>
       <div class="resources-container"></div>
       <div>
         <label style="font-size: 0.9em; margin-top: 8px;">Notes for this machine:</label>
@@ -75,9 +130,7 @@
         <option>HuileLubrification</option>
         <option>HuileBoite</option>
         <option>HuilePont</option>
-        <option>HuileDirection</option>
-      </select>
-      <input name="quantity" type="number" placeholder="Quantity" required>
+        <option>HuileDirection</option>      </select>      <input name="quantity" type="number" placeholder="Quantity" required>
       <button type="button" class="btn small remove-resource">✕</button>
     </div>
   </template>
@@ -90,10 +143,6 @@
     <textarea id="general-notes" name="general-notes" rows="3"></textarea>
   </div>
 
-  <!-- Your application script, including Dexie setup and sync logic -->
-  <script src="config.global.js"></script>
-  <script src="app.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>
 </body>
 </html>

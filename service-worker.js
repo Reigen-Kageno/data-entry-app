@@ -1,17 +1,17 @@
 const CACHE_NAME = 'basalt-data-entry-v1';
 const ASSETS_TO_CACHE = [
     '.',
-    '/index.html',
-    '/app.js',
-    '/auth.js',
-    '/config.global.js',
-    '/masterData.js',
-    '/manifest.json',
-    '/favicon.ico',
-    '/icon192.png',
-    '/icon512.png',
-    'https://unpkg.com/dexie@latest/dist/dexie.js',
-    'https://alcdn.msauth.net/browser/2.30.0/js/msal-browser.min.js'
+    'index.html',
+    'app.js',
+    'auth.js',
+    'config.global.js',
+    'masterData.js',
+    'manifest.json',
+    'favicon.ico',
+    'icon192.png',
+    'icon512.png',
+    'libs/dexie.min.js',
+    'libs/msal-browser.min.js'
 ];
 // Install event - cache assets
 self.addEventListener('install', event => {

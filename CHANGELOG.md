@@ -17,6 +17,9 @@ This document tracks significant changes and updates to the SOECO Basalt Site Da
 ### Changed
 - **Database Schema:** Upgraded the database to version 13 to support new data fields and improve indexing.
 
+### Fixed
+- **Critical Offline Loading Error:** Resolved an issue (`net::ERR_INTERNET_DISCONNECTED`) that prevented the app from loading when offline. All third-party libraries (Dexie.js, MSAL) are now stored locally in a `libs/` directory and cached by the service worker, ensuring the application is fully self-contained and offline-capable.
+
 
 ### [Date, July 24, 2024] - Debugging & Stability Fixes
 

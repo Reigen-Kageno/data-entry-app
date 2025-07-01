@@ -44,8 +44,13 @@ This section details the role of each primary JavaScript file in the application
 
 *   **`service-worker.js` (Offline Caching Strategy)**
     *   **Primary Role**: Implements the Progressive Web App (PWA) caching strategy for offline access.
-    *   **Caching**: Caches static assets (`index.html`, JS files, icons) and intercepts network requests to serve content from cache when offline.
+    *   **Caching**: Caches static assets (`index.html`, JS files, icons, and local libraries) and intercepts network requests to serve content from cache when offline.
     *   **Exclusions**: Explicitly avoids caching API calls to SharePoint or authentication endpoints.
+
+*   **`libs/` (Local Libraries Directory)**
+    *   **Primary Role**: Stores local copies of third-party JavaScript libraries (e.g., `dexie.min.js`, `msal-browser.min.js`).
+    *   **Offline-First**: Ensures the application's core dependencies are always available, even when offline, by avoiding reliance on external CDNs.
+    *   **Version Control**: This directory **must** be committed to the repository to ensure the application functions correctly when deployed.
 
 *   **IndexedDB Schema (within `app.js` and `PROJECT_CHARTER.md`)**
     *   **Primary Role**: Defines the local database structure using Dexie.js.
@@ -148,4 +153,3 @@ graph TD
 *   **UI Feedback**: Sync status and error messages are provided to the user.
 
 ---
-

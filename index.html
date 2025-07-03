@@ -68,29 +68,29 @@
   </script>
 </head>
 <body>
-  <h2>Daily Entry</h2>
+  <h2>Saisie Quotidienne</h2>
   <label>Date: <input type="date" id="entry-date" name="entry-date" required></label>
 
 
   <datalist id="machine-list"></datalist>
 
   <div class="stock-info-section">
-    <h3>Resource Stock & Checks</h3>
+    <h3>Stock des Ressources & Vérifications</h3>
     <div id="resource-stock-cards-container"></div> <!-- Container for stock cards -->
   </div>
 
   <form id="entry-form">
     <div id="machines-container"></div>
-    <button type="button" class="btn" id="add-machine">+ Add Machine</button> <!-- This button will be hidden/shown -->
-    <button type="submit" class="btn" id="save-entries-btn">Save All Entries</button>
-    <button type="button" class="btn" id="edit-entries-btn" style="display:none;">Edit Entries</button> <!-- Initially hidden -->
+    <button type="button" class="btn" id="add-machine">+ Ajouter Machine</button> <!-- This button will be hidden/shown -->
+    <button type="submit" class="btn" id="save-entries-btn">Enregistrer Toutes les Entrées</button>
+    <button type="button" class="btn" id="edit-entries-btn" style="display:none;">Modifier les Entrées</button> <!-- Initially hidden -->
   </form>
   <!-- This p#status will be used by app.js as syncStatus -->
-  <p id="syncStatus">Loading status...</p>
+  <p id="syncStatus">Statut de chargement...</p>
   <template id="machine-template">
     <div class="machine-section">
       <div style="display: flex; gap: 10px; margin-bottom: 10px;">        <label style="flex: 1;">
-          Machine ID: 
+          ID Machine: 
           <input name="machine" 
                  list="machine-list"
                  required
@@ -103,7 +103,7 @@
           <input name="machine-display-name" readonly style="width: 100%; background-color: #f5f5f5;">
         </label>
       </div>
-      <label style="display: block; margin-bottom: 10px;">Zone Activité: 
+      <label style="display: block; margin-bottom: 10px;">Zone d'Activité: 
         <select name="zone-activite" required style="width: 200px;">
           <option value="">-- Sélectionner une zone --</option>
         </select>
@@ -114,10 +114,10 @@
       </div>
       <div class="resources-container"></div>
       <div>
-        <label style="font-size: 0.9em; margin-top: 8px;">Notes for this machine:</label>
+        <label style="font-size: 0.9em; margin-top: 8px;">Notes pour cette machine :</label>
         <textarea name="machine-notes" rows="2" style="width: 100%; box-sizing: border-box; font-size: 0.9em;"></textarea>
       </div>
-      <button type="button" class="btn small add-resource">+ Add Resource</button>
+      <button type="button" class="btn small add-resource">+ Ajouter Ressource</button>
     </div>
   </template>
 
@@ -130,16 +130,16 @@
         <option>HuileLubrification</option>
         <option>HuileBoite</option>
         <option>HuilePont</option>
-        <option>HuileDirection</option>      </select>      <input name="quantity" type="number" placeholder="Quantity" required>
+        <option>HuileDirection</option>      </select>      <input name="quantity" type="number" placeholder="Quantité" required>
       <button type="button" class="btn small remove-resource">✕</button>
     </div>
   </template>
 
-  <button type="button" class="btn" id="manual-sync-btn" style="margin-top: 20px;">Sync Now</button>
+  <button type="button" class="btn" id="manual-sync-btn" style="margin-top: 20px;">Synchroniser Maintenant</button>
 
   <!-- Add a general notes field to the form -->
   <div class="form-group">
-    <label for="general-notes">General Notes:</label>
+    <label for="general-notes">Notes Générales :</label>
     <textarea id="general-notes" name="general-notes" rows="3"></textarea>
   </div>
 

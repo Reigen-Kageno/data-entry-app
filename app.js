@@ -77,7 +77,7 @@ async function startApp() {
   console.log("Starting application initialization...");
   try {
     // Show a loading indicator to the user
-    document.getElementById('syncStatus').textContent = 'Initializing application...';
+    document.getElementById('syncStatus').textContent = 'Initialisation de l\'application...';
 
     await db.open();
     console.log("✅ Dexie DB open and migrated to latest version");
@@ -220,7 +220,7 @@ async function deleteEntriesByDate(dateString) {
 async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
     if (!navigator.onLine) {
         console.log("Offline. Sync deferred.");
-        updateSyncStatusUI(false, 'Offline. Entries are queued.');
+        updateSyncStatusUI(false, 'Hors ligne. Les entrées sont en file d\'attente.');
         return;
     }
 
@@ -228,12 +228,12 @@ async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
     let token = await getToken();
     if (!token) {
       console.error("Failed to acquire authentication token");
-      updateSyncStatusUI(true, 'Authentication failed. Please try again.');
+      updateSyncStatusUI(true, 'Échec de l\'authentification. Veuillez réessayer.');
       return;
     }
 
     console.log("Online. Attempting to sync entries...");
-    if (showStatus) updateSyncStatusUI(true, manualTrigger ? 'Manual Sync: Syncing...' : 'Syncing...');
+    if (showStatus) updateSyncStatusUI(true, manualTrigger ? 'Synchronisation manuelle : En cours...' : 'Synchronisation en cours...');
     
     let queuedEntries = [];
     let queuedStockChecks = [];
@@ -244,7 +244,7 @@ async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
 
     if (queuedEntries.length === 0 && queuedStockChecks.length === 0) {
       console.log(manualTrigger ? "Manual Sync: No data to sync." : "No data to sync.");
-      if (showStatus) updateSyncStatusUI(true, 'All data already synced.');
+      if (showStatus) updateSyncStatusUI(true, 'Toutes les données sont déjà synchronisées.');
       return;
     }
 
@@ -365,17 +365,17 @@ async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
     const remainingStockChecks = await db.stockChecks.where('syncStatus').equals(0).toArray();
     
     if (remainingEntries.length > 0 || remainingStockChecks.length > 0) {
-      const msg = `Sync attempted. ${remainingEntries.length} entries and ${remainingStockChecks.length} stock checks still queued.`;
+      const msg = `Tentative de synchronisation. ${remainingEntries.length} entrées et ${remainingStockChecks.length} vérifications de stock sont toujours en file d'attente.`;
       console.log(msg);
       updateSyncStatusUI(true, msg);
     } else {
       console.log(manualTrigger ? "Manual Sync: All data synced." : "All data synced.");
-      updateSyncStatusUI(true, 'Sync complete. All data synced.');
+      updateSyncStatusUI(true, 'Synchronisation complète. Toutes les données sont synchronisées.');
     }
 
   } catch (error) {
     console.error('Network or other sync error:', error);
-    if (showStatus) updateSyncStatusUI(true, `Sync failed: ${error.message}`);
+    if (showStatus) updateSyncStatusUI(true, `La synchronisation a échoué : ${error.message}`);
     return;
   }
 }
@@ -385,14 +385,14 @@ async function syncQueuedEntries(showStatus = true, manualTrigger = false) {
 
 window.addEventListener('offline', () => {
     console.log("Application is now offline.");
-    updateSyncStatusUI(false, 'Offline. Entries will be queued.', false); // Pass false for isOnline
+    updateSyncStatusUI(false, 'Hors ligne. Les entrées seront mises en file d\'attente.', false); // Pass false for isOnline
     updateSyncButtonState(); // Update button state
 });
 
 // Handle when app comes back online
 window.addEventListener('online', () => {
     console.log("Application is now online.");
-    updateSyncStatusUI(true, 'Online. Ready to sync.', true);
+    updateSyncStatusUI(true, 'En ligne. Prêt à synchroniser.', true);
     updateSyncButtonState();
 });
 
@@ -401,7 +401,7 @@ window.addEventListener('online', () => {
 function updateSyncStatusUI(isOnline, message) {
   const statusElement = document.getElementById('syncStatus');
   if (statusElement) {
-    statusElement.textContent = `Online: ${isOnline} - ${message}`;
+    statusElement.textContent = `En ligne : ${isOnline} - ${message}`;
     statusElement.className = isOnline ? 'status-online' : 'status-offline';
   }
   console.log(`UI Sync Status: Online: ${isOnline} - ${message}`);
@@ -413,7 +413,7 @@ function updateSyncButtonState() {
   const syncButton = document.getElementById('manual-sync-btn');
   if (syncButton) {
     syncButton.disabled = !navigator.onLine;
-    syncButton.textContent = navigator.onLine ? 'Sync Now' : 'Offline';
+    syncButton.textContent = navigator.onLine ? 'Synchroniser Maintenant' : 'Hors ligne';
   }
 }
 
@@ -588,7 +588,7 @@ function initializeAppUI() {
 
         // Setup machine section removal
         const removeBtn = document.createElement('button');
-        removeBtn.textContent = '✕ Remove Machine';
+        removeBtn.textContent = '✕ Supprimer Machine';
         removeBtn.className = 'btn small';
         removeBtn.style.float = 'right';
         removeBtn.onclick = () => {
@@ -655,7 +655,7 @@ function initializeAppUI() {
                 });
                 addMachineBtn.style.display = isEditable ? '' : 'none';
                 saveBtn.style.display = isEditable ? '' : 'none';
-                saveBtn.textContent = isEditable ? (editBtn.style.display === 'none' ? 'Save All Entries' : 'Update Entries') : 'Save All Entries';
+                saveBtn.textContent = isEditable ? (editBtn.style.display === 'none' ? 'Enregistrer Toutes les Entrées' : 'Mettre à Jour les Entrées') : 'Enregistrer Toutes les Entrées';
                 editBtn.style.display = isEditable ? 'none' : '';
                 updateSyncButtonState();
                 
@@ -741,17 +741,17 @@ function initializeAppUI() {
             : baseStockQty + netMovementToday;
 
         const stockValueEl = cardElement.querySelector('.stock-value');
-        if (stockValueEl) stockValueEl.textContent = `Stock: ${displayStock.toFixed(1)}`;
+        if (stockValueEl) stockValueEl.textContent = `Stock : ${displayStock.toFixed(1)}`;
 
         const measuredDisplayEl = cardElement.querySelector('.measured-stock-display');
         if (measuredDisplayEl) {
             const todayMeasured = dailyStockCheckOverrides[forDate] && dailyStockCheckOverrides[forDate][resourceName] !== undefined
                 ? dailyStockCheckOverrides[forDate][resourceName] : 'N/A';
-            measuredDisplayEl.textContent = `Measured: ${todayMeasured}`;
+            measuredDisplayEl.textContent = `Mesuré : ${todayMeasured}`;
         }
 
         const deltaEl = cardElement.querySelector('.stock-delta');
-        if (deltaEl) deltaEl.textContent = `Δ Today: +${sumDeliveriesToday.toFixed(1)} | -${sumUsagesToday.toFixed(1)}`;
+        if (deltaEl) deltaEl.textContent = `Δ Aujourd'hui : +${sumDeliveriesToday.toFixed(1)} | -${sumUsagesToday.toFixed(1)}`;
     }
 
     async function handleSaveStockCheck(resourceName, cardElement, quantityOnHand) {
@@ -774,7 +774,7 @@ function initializeAppUI() {
         dailyStockCheckOverrides[forDate][resourceName] = quantityOnHand;
 
         await updateCardStockDisplay(resourceName, forDate);
-        alert(`Stock check for ${resourceName} on ${forDate} saved: ${quantityOnHand}.`);
+        alert(`Vérification du stock pour ${resourceName} le ${forDate} enregistrée : ${quantityOnHand}.`);
     }
 
     function promptForMeasuredStock(resourceName, cardElement) {
@@ -782,13 +782,13 @@ function initializeAppUI() {
         let currentMeasured = (dailyStockCheckOverrides[forDate] && dailyStockCheckOverrides[forDate][resourceName] !== undefined)
             ? dailyStockCheckOverrides[forDate][resourceName]
             : '';
-        const measuredStockStr = prompt(`Enter measured stock for ${resourceName} on ${forDate}:`, currentMeasured);
+        const measuredStockStr = prompt(`Entrez le stock mesuré pour ${resourceName} le ${forDate} :`, currentMeasured);
 
         if (measuredStockStr === null) return;
 
         const quantityOnHand = parseFloat(measuredStockStr);
         if (isNaN(quantityOnHand)) {
-            alert('Please enter a valid number for measured stock.');
+            alert('Veuillez entrer un nombre valide pour le stock mesuré.');
             return;
         }        // Use the compound key for the update
         handleSaveStockCheck(resourceName, cardElement, quantityOnHand);
@@ -796,7 +796,7 @@ function initializeAppUI() {
 
     async function loadEntriesForDate(dateString) {
         console.log(`Loading entries for date: ${dateString}`);
-        if(syncStatusElement) syncStatusElement.textContent = `Loading entries for ${dateString}...`;
+        if(syncStatusElement) syncStatusElement.textContent = `Chargement des entrées pour ${dateString}...`;
         
         clearAllFormEntries(); // This will also call updateCardStockDisplay for all resources
         clearTrackingSets(); // Reset our duplicate tracking system
@@ -806,7 +806,7 @@ function initializeAppUI() {
 
         if (entries && entries.length > 0) {
           const uiMachineSections = new Map(); // Use a map to track UI sections for each machine
-            if(syncStatusElement) syncStatusElement.textContent = `Displaying ${entries.length} saved entries for ${dateString}.`;
+            if(syncStatusElement) syncStatusElement.textContent = `Affichage de ${entries.length} entrées enregistrées pour ${dateString}.`;
             let notesLoaded = false;
             entries.forEach(entry => {
                 let machineSection = uiMachineSections.get(entry.machine);
@@ -874,12 +874,12 @@ function initializeAppUI() {
                 }
             });
             setFormEditable(false);
-            saveBtn.textContent = 'Save All Entries';
+            saveBtn.textContent = 'Enregistrer Toutes les Entrées';
         } else {
             if(syncStatusElement) syncStatusElement.textContent = `Pas de données pour ${dateString}. Prêt pour une nouvelle saisie.`;
             addMachineSection();
             setFormEditable(true);
-            saveBtn.textContent = 'Save All Entries';
+            saveBtn.textContent = 'Enregistrer Toutes les Entrées';
         }
 
         // After populating form or setting to new entry mode, update all card stock displays
@@ -1102,8 +1102,8 @@ function initializeAppUI() {
 
         // Proceed with making the form editable
         setFormEditable(true);
-        saveBtn.textContent = 'Update Entries';
-        if (syncStatusElement) syncStatusElement.textContent = 'Form is now editable for update.';
+        saveBtn.textContent = 'Mettre à Jour les Entrées';
+        if (syncStatusElement) syncStatusElement.textContent = 'Le formulaire est maintenant modifiable pour mise à jour.';
     });
 
     // Form Submit Handler
@@ -1156,7 +1156,7 @@ function initializeAppUI() {
             }
         }
 
-        if (syncStatusElement) syncStatusElement.textContent = `${entriesProcessedCount} entries saved/updated locally and queued for sync.`;
+        if (syncStatusElement) syncStatusElement.textContent = `${entriesProcessedCount} entrées enregistrées/mises à jour localement et mises en file d'attente pour la synchronisation.`;
         await loadEntriesForDate(entryDateValue);
     });
 
@@ -1174,9 +1174,9 @@ function initializeAppUI() {
     });
 
     if (navigator.onLine) {
-        updateSyncStatusUI(true, 'Online.');
+        updateSyncStatusUI(true, 'En ligne.');
     } else {
-        updateSyncStatusUI(false, 'Offline. Entries will be queued.');
+        updateSyncStatusUI(false, 'Hors ligne. Les entrées seront mises en file d\'attente.');
     }
 
     loadEntriesForDate(dateInput.value); // Load for today's date
@@ -1207,7 +1207,7 @@ if (msalInstance.getAllAccounts().length > 0) {
 } else if (!window.location.hash.includes('code=')) {
   // If we don't have an account and we are not in a redirect, trigger the login.
   // The app will be started by the callback after the redirect.
-  document.getElementById('syncStatus').textContent = 'Redirecting to login...';
+  document.getElementById('syncStatus').textContent = 'Redirection vers la page de connexion...';
   getToken();
 }
 // If we are in a redirect (hash contains 'code='), auth.js will handle it and call our callback.

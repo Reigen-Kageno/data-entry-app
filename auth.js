@@ -26,21 +26,23 @@ const graphConfig = {
 // Initialize MSAL
 const msalInstance = new msal.PublicClientApplication(msalConfig);
 
-
-// Handle redirect promise
-msalInstance?.handleRedirectPromise()
-    .then(response => {
-        if (response && response.account) {
-            console.log("User account found after redirect:", response.account.username);
-            onAuthSuccessCallback?.(); // Trigger the callback
-        }
-    })
-    .catch(error => {
-        console.error("Error handling redirect:", error);
-        if (error.errorMessage) {
-            console.error("MSAL Error details:", error.errorMessage);
-        }
-    });
+function handleAuthRedirect() {
+    msalInstance.handleRedirectPromise()
+        .then(response => {
+            if (response && response.account) {
+                console.log("User account found after redirect:", response.account.username);
+                if (onAuthSuccessCallback) {
+                    onAuthSuccessCallback();
+                }
+            }
+        })
+        .catch(error => {
+            console.error("Error handling redirect:", error);
+            if (error.errorMessage) {
+                console.error("MSAL Error details:", error.errorMessage);
+            }
+        });
+}
 
 async function getToken() {
     console.log('getToken: Starting token acquisition...');
@@ -86,4 +88,5 @@ export {
     getToken,
     graphConfig,
     setAuthSuccessCallback,
+    handleAuthRedirect,
 };

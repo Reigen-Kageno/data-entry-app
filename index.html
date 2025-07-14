@@ -28,6 +28,38 @@
     .stock-card.disabled:hover { background: none; } /* Prevent hover effect when disabled */
     .stock-card .badge { position: absolute; top: -6px; right: -6px; background: red; color: white; border-radius: 50%; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.8em; }
     .stock-card:hover { background: #f0f0f0; }
+    .tab-nav { border-bottom: 1px solid #ccc; margin-bottom: 16px; }
+    .tab-btn { padding: 10px 15px; cursor: pointer; border: 1px solid #ccc; border-bottom: none; background: #f1f1f1; margin-right: 5px; border-radius: 5px 5px 0 0; }
+    .tab-btn.active { background: #fff; border-bottom: 1px solid #fff; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .production-card, .ventes-card, .ressource-card {
+      position: relative;
+      border: 1px solid #ccc;
+      padding: 12px;
+      margin-bottom: 16px;
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .invalid {
+      border-color: red !important;
+      background-color: #fff0f0;
+    }
+    .card-readonly {
+      background-color: #f9f9f9;
+      opacity: 0.8;
+    }
+    .status-new {
+      border: 2px solid #ccc; /* Default/New */
+    }
+    .status-saved {
+      border: 2px solid #ffc107; /* Yellow */
+    }
+    .status-synced {
+      border: 2px solid #4caf50; /* Green */
+    }
   </style>  
   
   <!-- Load MSAL first -->
@@ -71,41 +103,63 @@
   <h2>Saisie Quotidienne</h2>
   <label>Date: <input type="date" id="entry-date" name="entry-date" required></label>
 
-
-  <datalist id="machine-list"></datalist>
-
-  <div class="stock-info-section">
-    <h3>Stock des Ressources & Vérifications</h3>
-    <div id="resource-stock-cards-container"></div> <!-- Container for stock cards -->
+  <div class="tab-nav">
+    <button class="tab-btn active" data-tab="ressources">Ressources</button>
+    <button class="tab-btn" data-tab="production">Production</button>
+    <button class="tab-btn" data-tab="ventes">Ventes</button>
   </div>
 
-  <form id="entry-form">
-    <div id="machines-container"></div>
-    <button type="button" class="btn" id="add-machine">+ Ajouter Machine</button> <!-- This button will be hidden/shown -->
-    <button type="submit" class="btn" id="save-entries-btn">Enregistrer Toutes les Entrées</button>
-    <button type="button" class="btn" id="edit-entries-btn" style="display:none;">Modifier les Entrées</button> <!-- Initially hidden -->
-  </form>
+  <datalist id="machine-list"></datalist>
+  <datalist id="truck-list"></datalist>
+  <datalist id="client-list"></datalist>
+
+  <div id="global-controls" style="margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: #f7f7f7;">
+    <button type="button" class="btn" id="edit-day-btn">Modifier la Journée</button>
+    <button type="button" class="btn" id="delete-selected-btn" style="display: none; background-color: #e53935;">Supprimer la Sélection</button>
+  </div>
+
+  <div id="ressources" class="tab-content active">
+    <div class="stock-info-section">
+      <h3>Stock des Ressources & Vérifications</h3>
+      <div id="resource-stock-cards-container"></div> <!-- Container for stock cards -->
+    </div>
+    <div id="ressources-entries-container"></div>
+    <button type="button" class="btn" id="add-ressource-btn">+ Ajouter Machine</button>
+  </div>
+
+  <div id="production" class="tab-content">
+    <h3>Production</h3>
+    <div id="production-entries-container"></div>
+    <button type="button" class="btn" id="add-production-btn">+ Ajouter Production</button>
+  </div>
+
+  <div id="ventes" class="tab-content">
+    <h3>Ventes</h3>
+    <div id="ventes-entries-container"></div>
+    <button type="button" class="btn" id="add-vente-btn">+ Ajouter Vente</button>
+  </div>
   <!-- This p#status will be used by app.js as syncStatus -->
   <p id="syncStatus">Statut de chargement...</p>
-  <template id="machine-template">
-    <div class="machine-section">
-      <div style="display: flex; gap: 10px; margin-bottom: 10px;">        <label style="flex: 1;">
-          ID Machine: 
-          <input name="machine" 
-                 list="machine-list"
-                 required
-                 style="width: 100%;"
-                 autocomplete="off"
-                 title="Veuillez sélectionner une machine de la liste">
+  <template id="ressource-card-template">
+    <div class="ressource-card machine-section status-new">
+      <input type="checkbox" class="entry-checkbox" style="position: absolute; top: 10px; right: 10px;">
+      <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+        <label style="flex: 1;">
+          ID Machine:
+          <input name="machine" list="machine-list" required style="width: 100%;" autocomplete="off" title="Veuillez sélectionner une machine de la liste">
         </label>
         <label style="flex: 1;">
-          Nom Machine: 
+          Nom Machine:
           <input name="machine-display-name" readonly style="width: 100%; background-color: #f5f5f5;">
         </label>
       </div>
-      <label style="display: block; margin-bottom: 10px;">Zone d'Activité: 
+      <label style="display: block; margin-bottom: 10px;">Zone d'Activité:
         <select name="zone-activite" required style="width: 200px;">
           <option value="">-- Sélectionner une zone --</option>
+          <option value="Concassage">Concassage</option>
+          <option value="Extraction">Extraction</option>
+          <option value="Autres">Autres</option>
+          <option value="BTC">BTC</option>
         </select>
       </label>
       <div class="machine-meter">
@@ -131,17 +185,51 @@
         <option>HuileBoite</option>
         <option>HuilePont</option>
         <option>HuileDirection</option>      </select>      <input name="quantity" type="number" placeholder="Quantité" required>
-      <button type="button" class="btn small remove-resource">✕</button>
+  <button type="button" class="btn small remove-resource">✕</button>
+    </div>
+  </template>
+
+  <template id="production-card-template">
+    <div class="production-card status-new">
+      <input type="checkbox" class="entry-checkbox" style="position: absolute; top: 10px; right: 10px;">
+      <label>ID Camion: <input type="text" name="idCamion" list="truck-list" required autocomplete="off" style="width: 100%;"></label>
+      <label>Poids (tonnes): <input type="number" name="poids" step="0.01" required style="width: 100%;"></label>
+      <label>Origine:
+        <select name="origine" required style="width: 100%;">
+          <option value="Extraction">Extraction</option>
+          <option value="Stockage">Stockage</option>
+        </select>
+      </label>
+      <label>Destination:
+        <select name="destination" required style="width: 100%;">
+          <option value="Concassage">Concassage</option>
+          <option value="Stockage">Stockage</option>
+        </select>
+      </label>
+      <label>Commentaire: <textarea name="commentaire" rows="2" style="width: 100%;"></textarea></label>
+    </div>
+  </template>
+
+  <template id="ventes-card-template">
+    <div class="ventes-card status-new">
+      <input type="checkbox" class="entry-checkbox" style="position: absolute; top: 10px; right: 10px;">
+      <label>Client: <input type="text" name="client" list="client-list" required autocomplete="off" style="width: 100%;"></label>
+      <label>Produit: 
+        <select name="produit" required style="width: 100%;">
+          <option value="3/8">3/8</option>
+          <option value="8/16">8/16</option>
+          <option value="0.3">0.3</option>
+        </select>
+      </label>
+      <label>Quantité: <input type="text" name="quantite" required style="width: 100%;"></label>
+      <label>Montant payé (CFA): <input type="number" name="montantPaye" style="width: 100%;"></label>
+      <label>Commentaire: <textarea name="commentaire" rows="2" style="width: 100%;"></textarea></label>
     </div>
   </template>
 
   <button type="button" class="btn" id="manual-sync-btn" style="margin-top: 20px;">Synchroniser Maintenant</button>
-
-  <!-- Add a general notes field to the form -->
-  <div class="form-group">
-    <label for="general-notes">Notes Générales :</label>
-    <textarea id="general-notes" name="general-notes" rows="3"></textarea>
-  </div>
+  <button type="button" class="btn" id="save-all-btn" style="margin-top: 20px; background-color: #4CAF50;">Enregistrer les Modifications</button>
+  <button type="button" class="btn" id="refresh-data-btn" style="margin-top: 20px; background-color: #f44336;" title="Supprime toutes les données locales et les remplace par les données du serveur. Utiliser en cas de nouvelle installation ou de corruption des données.">Actualiser les données du serveur</button>
 
 <script>eruda.init();</script>
 </body>

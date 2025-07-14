@@ -1,15 +1,22 @@
 # Basalt Site Data Entry App
 
-This application is designed for SOECO's daily resource consumption tracking. It allows operators to record machine usage and resource consumption data, which syncs with SharePoint for centralized data management.
+This application is designed for SOECO's daily data tracking needs, including resource consumption, production, and sales. It allows operators to record machine usage, resource consumption, production output, and sales data, which syncs with SharePoint for centralized data management.
 
 ## Technical Overview
 
-### Database Schema (Version 13)
+### Database Schema (Version 15)
+The application now uses a three-tab navigation system (`Ressources`, `Production`, `Ventes`).
+
 For detailed schema definitions, please refer to `PROJECT_CHARTER.md`.
 
 For a comprehensive technical architecture overview, see `ARCHITECTURE.md`.
 
 ### Core Features
+
+#### Tab-Based Navigation
+- **Ressources**: Tracks daily resource consumption by machine.
+- **Production**: Logs the movement of basalt from extraction/stockage to crushing/stockage.
+- **Ventes**: Records daily sales of products to various clients.
 
 #### Machine Data Management
 - SharePoint integration for machine list.
@@ -17,6 +24,19 @@ For a comprehensive technical architecture overview, see `ARCHITECTURE.md`.
 - Prevents duplicate machine entries per day.
 - Shows machine display name for clarity.
 - Tracks machine active status from SharePoint.
+
+#### Production Tracking
+- Records production entries with truck ID, weight, origin, and destination.
+- Uses the master machine list for truck ID autocomplete.
+
+#### Sales Tracking
+- Records sales entries with client, product, quantity, and payment amount.
+- Features a dynamic autocomplete for client names based on previous entries.
+
+#### Data Refresh from Server
+- **Full Data Overwrite**: A new "Actualiser les données du serveur" button allows users to completely refresh the local data with the data from the SharePoint server.
+- **Use Cases**: This feature is intended for initial setup on a new device or for recovery in case of local data corruption.
+- **Data Integrity**: The process is atomic, ensuring that the local database is not left in a partially updated state.
 
 #### Resource Tracking
 ```javascript

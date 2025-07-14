@@ -10,18 +10,23 @@ class MasterDataManager {
     async initialize() {
         if (this.initialized) return;
 
-        // First load from IndexedDB
+        // First, load from IndexedDB. This is fast and ensures the app can start.
         await this.loadFromCache();
+        this.initialized = true; // Mark as initialized so the app can proceed
         
-        // Then refresh from SharePoint if online
+        // Then, trigger a refresh from SharePoint in the background if online.
+        // We don't await this, so it doesn't block the UI.
         if (navigator.onLine) {
-            const refreshed = await this.refreshFromSharePoint(false); // Don't show UI status during initial load
-            if (!refreshed) {
-                console.warn("MasterDataManager: Initial refresh from SharePoint failed, using cached data if available.");
-            }
+            this.refreshFromSharePoint().then(refreshed => {
+                if (refreshed) {
+                    console.log("Background refresh of master data successful.");
+                    // Optionally, trigger an event to update the UI if needed
+                    window.dispatchEvent(new CustomEvent('master-data-refreshed'));
+                } else {
+                    console.warn("Background refresh of master data failed.");
+                }
+            });
         }
-
-        this.initialized = true;
     }
 
     async loadFromCache() {

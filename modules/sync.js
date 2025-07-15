@@ -4,6 +4,12 @@ import config from '../config.global.js';
 import { updateSyncStatusUI, loadEntriesForDate } from './ui.js';
 import { getQueuedDeletions } from './data.js';
 
+/**
+ * All sync operations use uniqueKey as the primary identifier for entries.
+ * This ensures data consistency and prevents duplicates both locally and on SharePoint.
+ * syncStatus: 0 = not synced, 1 = synced
+ */
+
 // --- Data Refresh from Server ---
 async function fetchAllSharePointListItems(token, listId) {
   let items = [];

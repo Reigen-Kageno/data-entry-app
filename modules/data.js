@@ -1,25 +1,44 @@
 import { db } from './database.js';
 
-// Example: Function to add a new form entry
+/**
+ * Checks if a form entry with the same uniqueKey already exists.
+ * @param {string} uniqueKey
+ * @returns {Promise<boolean>} true if duplicate exists
+ */
+export async function formEntryExists(uniqueKey) {
+  const entry = await db.formEntries.where({ uniqueKey }).first();
+  return !!entry;
+}
+
+/**
+ * Adds a new form entry, enforcing uniqueKey uniqueness.
+ * @param {Object} entryData
+ * @returns {Promise<number|null>} id if added, null if duplicate
+ */
 export async function addFormEntry(entryData) {
   try {
-    // entryData should be an object representing a row in your target format
-    // Add syncStatus if not present (0 = not synced, 1 = synced)
+    if (await formEntryExists(entryData.uniqueKey)) {
+      console.warn(`Duplicate uniqueKey detected: ${entryData.uniqueKey}`);
+      return null;
+    }
     const dataToAdd = {
       ...entryData,
       syncStatus: 0
     };
-    delete dataToAdd.status; // Remove old status field if present
-    
+    delete dataToAdd.status;
     const id = await db.formEntries.add(dataToAdd);
     console.log(`Form entry added with id ${id}`);
     return id;
   } catch (error) {
     console.error("Error adding form entry:", error);
+    return null;
   }
 }
 
-// Example: Function to get all unsynced form entries
+/**
+ * Gets all unsynced form entries.
+ * @returns {Promise<Array>}
+ */
 export async function getQueuedEntries() {
   try {
     const entries = await db.formEntries.where('syncStatus').equals(0).toArray();
@@ -31,7 +50,12 @@ export async function getQueuedEntries() {
   }
 }
 
-// Example: Function to update an entry's sync status
+/**
+ * Updates an entry's sync status.
+ * @param {number} id
+ * @param {boolean} isSynced
+ * @returns {Promise<number>}
+ */
 export async function updateEntryStatus(id, isSynced) {
   try {
     const count = await db.formEntries.update(id, { syncStatus: isSynced ? 1 : 0 });
@@ -43,10 +67,15 @@ export async function updateEntryStatus(id, isSynced) {
     return count;
   } catch (error) {
     console.error("Error updating entry status:", error);
+    return 0;
   }
 }
 
-// Example: Function to delete an entry (e.g., after successful sync)
+/**
+ * Deletes an entry from a table.
+ * @param {string} tableName
+ * @param {number} id
+ */
 export async function deleteEntry(tableName, id) {
   try {
     await db[tableName].delete(id);
@@ -56,6 +85,12 @@ export async function deleteEntry(tableName, id) {
   }
 }
 
+/**
+ * Queues an entry for deletion on SharePoint and deletes locally.
+ * @param {string} tableName
+ * @param {string} listName
+ * @param {number} id
+ */
 export async function deleteEntryAndQueue(tableName, listName, id) {
     try {
         const entry = await db[tableName].get(id);

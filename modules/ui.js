@@ -22,10 +22,31 @@ let isEditMode = false; // Global flag for edit mode
 
 // --- Helper Function Definitions ---
 
+// --- Exported UI sync status helpers for sync.js ---
+function updateSyncStatusUI(isOnline, message) {
+    if (syncStatusElement) {
+        syncStatusElement.textContent = message;
+        syncStatusElement.className = isOnline ? 'online' : 'offline';
+    }
+}
+
+function updateSyncButtonState() {
+    const syncBtn = document.getElementById('sync-btn');
+    if (!syncBtn) return;
+    if (navigator.onLine) {
+        syncBtn.disabled = false;
+        syncBtn.textContent = 'Synchroniser';
+    } else {
+        syncBtn.disabled = true;
+        syncBtn.textContent = 'Hors ligne';
+    }
+}
+
+export { updateSyncStatusUI, updateSyncButtonState };
+
 function getAvailableMachines() {
     return machineOptions.filter(m => !selectedMachines.has(m));
 }
-
 function updateMachineDatalist() {
     if (!machineList) return;
     machineList.innerHTML = '';
@@ -424,6 +445,8 @@ export function initializeAppUI(masterData) {
             }
         });
         resourceStockCardsContainer.appendChild(card);
+            // Update stock display for each card
+            updateCardStockDisplay(r, dateInput.value);
     });
 
     saveAllBtn.addEventListener('click', async () => {
@@ -551,10 +574,12 @@ async function saveCard(card, entryDate) {
         }
 
         // 2. Identify additions and updates
+        let hasResourceEntry = false;
         for (const row of newStateRows) {
             const resource = row.querySelector('select[name="resource"]').value;
             const quantity = parseFloat(row.querySelector('input[name="quantity"]').value);
             if (isNaN(quantity) || quantity <= 0 || !resource) continue;
+            hasResourceEntry = true;
 
             const existingEntry = oldState.find(e => e.resource === resource);
             const entryData = {
@@ -577,6 +602,29 @@ async function saveCard(card, entryDate) {
                 }
             } else {
                 // Add if it's a new resource for this machine
+                await db.formEntries.add(entryData);
+            }
+        }
+
+        // 3. If no valid resource entry, allow saving a machine-only entry for mileage
+        if (!hasResourceEntry) {
+            // Check if a machine-only entry already exists
+            const existingMachineOnly = oldState.find(e => !e.resource);
+            const entryData = {
+                date: entryDate,
+                machine: machineName,
+                zoneActivite,
+                resource: null,
+                quantity: null,
+                compteurMoteurDebut: compteurDebut,
+                compteurMoteurFin: compteurFin,
+                notes: machineNotes,
+                syncStatus: 0,
+                uniqueKey: `${machineName}-${entryDate}`
+            };
+            if (existingMachineOnly) {
+                await db.formEntries.update(existingMachineOnly.id, entryData);
+            } else {
                 await db.formEntries.add(entryData);
             }
         }
@@ -637,32 +685,29 @@ function toggleEditMode(isEditing) {
 
     if (isEditing) {
         editDayBtn.textContent = 'Enregistrer les Modifications';
-        editDayBtn.style.backgroundColor = '#4CAF50'; // Green for save
-        saveAllBtn.style.display = 'none'; // Hide the main save button
-        
+        editDayBtn.style.backgroundColor = '#4CAF50';
+        saveAllBtn.style.display = 'none';
         allCards.forEach(card => {
-            // Only make saved cards editable. New cards are already editable.
-            if (card.classList.contains('status-saved') || card.classList.contains('status-synced')) {
+            // Only allow editing for unsynced cards
+            if (card.classList.contains('status-synced')) {
+                setCardReadOnly(card, true, 1); // keep synced cards read-only
+            } else {
                 setCardReadOnly(card, false, -1);
-                card.style.border = '2px dashed #2196f3'; // Blue dashed border for editing
+                card.style.border = '2px dashed #2196f3';
             }
         });
     } else {
-        // This button click now effectively serves as the "Save All"
-        saveAllBtn.click(); 
-        
+        saveAllBtn.click();
         editDayBtn.textContent = 'Modifier la Journée';
-        editDayBtn.style.backgroundColor = '#2196f3'; // Blue for edit
+        editDayBtn.style.backgroundColor = '#2196f3';
         deleteSelectedBtn.style.display = 'none';
         saveAllBtn.style.display = 'inline-block';
-
         allCards.forEach(card => {
-            card.style.border = ''; // Reset border
+            card.style.border = '';
         });
     }
+
 }
-
-
 async function handleDeleteSelection() {
     const selectedCheckboxes = Array.from(document.querySelectorAll('.entry-checkbox:checked'));
     if (selectedCheckboxes.length === 0) return;
@@ -724,29 +769,9 @@ export async function loadEntriesForDate(dateString) {
         if(syncStatusElement) syncStatusElement.textContent = `Affichage des entrées pour ${dateString}.`;
     }
 
+    // Restore UI population
     await loadRessourcesEntries(dateString, ressources);
     await loadProductionEntries(dateString, production);
     await loadVentesEntries(dateString, ventes);
 
-    for (const resource of RESOURCES) {
-        await updateCardStockDisplay(resource, dateString);
-    }
-}
-
-export function updateSyncStatusUI(isOnline, message) {
-  const statusElement = document.getElementById('syncStatus');
-  if (statusElement) {
-    statusElement.textContent = `En ligne : ${isOnline} - ${message}`;
-    statusElement.className = isOnline ? 'status-online' : 'status-offline';
-  }
-  console.log(`UI Sync Status: Online: ${isOnline} - ${message}`);
-  updateSyncButtonState();
-}
-
-export function updateSyncButtonState() {
-  const syncButton = document.getElementById('manual-sync-btn');
-  if (syncButton) {
-    syncButton.disabled = !navigator.onLine;
-    syncButton.textContent = navigator.onLine ? 'Synchroniser Maintenant' : 'Hors ligne';
-  }
 }

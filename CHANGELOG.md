@@ -2,6 +2,21 @@
 
 This document tracks significant changes and updates to the SOECO Basalt Site Data Entry Application.
 
+## [1.9.3] - 2025-07-16
+
+### Added
+- **Production and Ventes Totals**: Added summary cards to the "Production" and "Ventes" tabs to display key daily totals.
+  - **Production**: Shows total weight, number of trips, and average weight per trip.
+  - **Ventes**: Shows total revenue, number of sales, and the total quantity sold for each product.
+
+## [1.9.2] - 2025-07-16
+
+### Fixed
+- **Stock Card Date Sync**: Fixed an issue where the stock cards were not updating when the selected date was changed. The cards now correctly refresh and display the stock levels for the selected date.
+
+### Changed
+- **Deletion Prevention for Synced Items**: To prevent accidental data modification, the checkbox for selecting an entry is now hidden if the entry has been synchronized with the server. This provides a clear visual cue that synced items cannot be deleted.
+
 ## [1.9.1] - 2025-07-14
 
 ### Changed

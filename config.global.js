@@ -20,7 +20,8 @@ const config = {
       machines: "6794d80e-561e-4aa1-9695-b62ffc516b26",
       formEntries: "8c6096b3-e014-4837-a395-7a461a6e25ca",
       stockChecks: "8f2c2330-3798-46e6-8f59-a889663b7b72",
-      ventes: "",
+      ventes: "3384f5a1-a69a-44e3-bcf7-72ebf37bdf58",
+      production: "541bcbae-e063-44b8-b5f9-2d06276446b4"
     }
   }
 };

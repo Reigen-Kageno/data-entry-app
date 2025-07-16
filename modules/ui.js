@@ -246,6 +246,12 @@ function setCardReadOnly(card, isReadOnly, syncStatus) {
         btn.style.display = isReadOnly ? 'none' : 'block';
     });
 
+    const checkbox = card.querySelector('.entry-checkbox');
+    if (checkbox) {
+        // Hide the checkbox if the item is synced, otherwise ensure it's visible
+        checkbox.style.display = (syncStatus === 1) ? 'none' : 'inline-block';
+    }
+
     card.classList.remove('status-new', 'status-saved', 'status-synced', 'card-readonly');
     if (isReadOnly) {
         card.classList.add('card-readonly');
@@ -774,4 +780,72 @@ export async function loadEntriesForDate(dateString) {
     await loadProductionEntries(dateString, production);
     await loadVentesEntries(dateString, ventes);
 
+    // After loading entries, refresh all stock cards for the new date
+    RESOURCES.forEach(resource => {
+        updateCardStockDisplay(resource, dateString);
+    });
+
+    // Update the new totals cards
+    updateProductionTotals(production);
+    updateVentesTotals(ventes);
+}
+
+function updateProductionTotals(entries) {
+    const container = document.getElementById('production-totals-container');
+    if (!container) return;
+
+    const totalWeight = entries.reduce((sum, entry) => sum + (entry.poids || 0), 0);
+    const tripCount = entries.length;
+    const averageWeight = tripCount > 0 ? totalWeight / tripCount : 0;
+
+    container.innerHTML = `
+        <div class="stock-card">
+            <span class="resource-name">Poids Total</span>
+            <div class="stock-value">${totalWeight.toFixed(2)} t</div>
+        </div>
+        <div class="stock-card">
+            <span class="resource-name">Nb. Voyages</span>
+            <div class="stock-value">${tripCount}</div>
+        </div>
+        <div class="stock-card">
+            <span class="resource-name">Poids Moyen</span>
+            <div class="stock-value">${averageWeight.toFixed(2)} t</div>
+        </div>
+    `;
+}
+
+function updateVentesTotals(entries) {
+    const container = document.getElementById('ventes-totals-container');
+    if (!container) return;
+
+    const totalRevenue = entries.reduce((sum, entry) => sum + (entry.montantPaye || 0), 0);
+    const salesCount = entries.length;
+    const productTotals = entries.reduce((acc, entry) => {
+        const quantity = parseFloat(entry.quantite) || 0;
+        if (!acc[entry.produit]) {
+            acc[entry.produit] = 0;
+        }
+        acc[entry.produit] += quantity;
+        return acc;
+    }, {});
+
+    let productTotalsHtml = '';
+    for (const [product, total] of Object.entries(productTotals)) {
+        productTotalsHtml += `<div><strong>${product}:</strong> ${total.toFixed(2)} m³</div>`;
+    }
+
+    container.innerHTML = `
+        <div class="stock-card">
+            <span class="resource-name">Revenu Total</span>
+            <div class="stock-value">${totalRevenue.toLocaleString('fr-FR')} CFA</div>
+        </div>
+        <div class="stock-card">
+            <span class="resource-name">Nb. Ventes</span>
+            <div class="stock-value">${salesCount}</div>
+        </div>
+        <div class="stock-card" style="width: auto; min-width: 150px;">
+            <span class="resource-name">Total par Produit</span>
+            <div class="stock-value">${productTotalsHtml}</div>
+        </div>
+    `;
 }

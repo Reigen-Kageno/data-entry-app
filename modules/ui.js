@@ -42,7 +42,7 @@ function updateSyncButtonState() {
     }
 }
 
-export { updateSyncStatusUI, updateSyncButtonState };
+export { updateSyncStatusUI, updateSyncButtonState, updateUnsyncedCount };
 
 function getAvailableMachines() {
     return machineOptions.filter(m => !selectedMachines.has(m));
@@ -483,6 +483,7 @@ export function initializeAppUI(masterData) {
         } else if (changesMade) {
             updateSyncStatusUI(navigator.onLine, 'Modifications enregistrées localement.');
             await loadEntriesForDate(entryDateValue);
+            updateUnsyncedCount();
         }
     });
 
@@ -533,6 +534,7 @@ export function initializeAppUI(masterData) {
 
     loadEntriesForDate(dateInput.value);
     updateSyncButtonState();
+    updateUnsyncedCount();
 }
 
 async function saveCard(card, entryDate) {
@@ -651,21 +653,62 @@ async function saveCard(card, entryDate) {
                 commentaire: card.querySelector('[name="commentaire"]').value.trim(),
                 syncStatus: 0
             };
-            if (!data.idCamion || isNaN(data.poids) || data.poids <= 0) isValid = false;
+            if (!data.idCamion || isNaN(data.poids) || data.poids <= 0) {
+                isValid = false;
+                if (!data.idCamion) idCamionInput.classList.add('invalid');
+                else idCamionInput.classList.remove('invalid');
+                if (isNaN(data.poids) || data.poids <= 0) poidsInput.classList.add('invalid');
+                else poidsInput.classList.remove('invalid');
+            } else {
+                idCamionInput.classList.remove('invalid');
+                poidsInput.classList.remove('invalid');
+            }
         } else { // vente
             table = db.ventes;
             const clientInput = card.querySelector('[name="client"]');
             const quantiteInput = card.querySelector('[name="quantite"]');
+            const montantPayeInput = card.querySelector('[name="montantPaye"]');
             data = {
                 date: entryDate,
                 client: clientInput.value.trim(),
                 produit: card.querySelector('[name="produit"]').value,
                 quantite: quantiteInput.value.trim(),
-                montantPaye: parseFloat(card.querySelector('[name="montantPaye"]').value) || 0,
+                montantPaye: parseFloat(montantPayeInput.value) || 0,
                 commentaire: card.querySelector('[name="commentaire"]').value.trim(),
                 syncStatus: 0
             };
-            if (!data.client || !data.quantite) isValid = false;
+            
+            if (!data.client) {
+                clientInput.classList.add('invalid');
+                isValid = false;
+            } else {
+                const existingClients = Array.from(document.getElementById('client-list').options).map(opt => opt.value);
+                if (!existingClients.includes(data.client)) {
+                    if (confirm(`Le client "${data.client}" n'existe pas. Voulez-vous l'ajouter ?`)) {
+                        const newOption = document.createElement('option');
+                        newOption.value = data.client;
+                        document.getElementById('client-list').appendChild(newOption);
+                        clientInput.classList.remove('invalid');
+                    } else {
+                        clientInput.classList.add('invalid');
+                        isValid = false;
+                    }
+                } else {
+                    clientInput.classList.remove('invalid');
+                }
+            }
+            if (!data.quantite) {
+                quantiteInput.classList.add('invalid');
+                isValid = false;
+            } else {
+                quantiteInput.classList.remove('invalid');
+            }
+            if (isNaN(data.montantPaye) || data.montantPaye <= 0) {
+                montantPayeInput.classList.add('invalid');
+                isValid = false;
+            } else {
+                montantPayeInput.classList.remove('invalid');
+            }
         }
 
         if (!isValid) return false;
@@ -848,4 +891,21 @@ function updateVentesTotals(entries) {
             <div class="stock-value">${productTotalsHtml}</div>
         </div>
     `;
+}
+
+async function updateUnsyncedCount() {
+    const badge = document.getElementById('unsynced-count-badge');
+    if (!badge) return;
+
+    const counts = await Promise.all([
+        db.formEntries.where('syncStatus').equals(0).count(),
+        db.production.where('syncStatus').equals(0).count(),
+        db.ventes.where('syncStatus').equals(0).count(),
+        db.stockChecks.where('syncStatus').equals(0).count()
+    ]);
+
+    const totalUnsynced = counts.reduce((sum, count) => sum + count, 0);
+
+    badge.textContent = totalUnsynced;
+    badge.style.display = totalUnsynced > 0 ? 'inline-block' : 'none';
 }

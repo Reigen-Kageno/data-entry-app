@@ -40,7 +40,7 @@ jobs:
           echo "      formEntries: \"${{ secrets.SHAREPOINT_LIST_ID_FORMENTRIES }}\"," >> config.global.js
           echo "      stockChecks: \"${{ secrets.SHAREPOINT_LIST_ID_STOCKCHECKS }}\"," >> config.global.js
           echo "      ventes: \"${{ secrets.SHAREPOINT_LIST_ID_VENTES }}\"," >> config.global.js
-          echo "      production: \"${{ secrets.SHAREPOINT_LIST_ID_PRODUCTION }}\"" >> config.global.j
+          echo "      production: \"${{ secrets.SHAREPOINT_LIST_ID_PRODUCTION }}\"" >> config.global.js
           echo "    }" >> config.global.js
           echo "  }" >> config.global.js
           echo "};" >> config.global.js

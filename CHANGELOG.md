@@ -2,6 +2,22 @@
 
 This document tracks significant changes and updates to the SOECO Basalt Site Data Entry Application.
 
+## [1.9.6] - 2025-07-16
+
+### Added
+- **Client Validation**: Implemented a confirmation prompt to prevent typos and ensure data consistency when adding a new client in the "Ventes" tab.
+
+## [1.9.5] - 2025-07-16
+
+### Fixed
+- **Field Validation**: Fixed a validation issue in the "Production" and "Ventes" tabs where fields with errors were not being highlighted in red.
+- **Mandatory Field**: The `montantPaye` field in the "Ventes" tab is now mandatory and must be greater than zero.
+
+## [1.9.4] - 2025-07-16
+
+### Added
+- **Unsynced Items Badge**: Added a badge to the "Synchroniser Maintenant" button that displays the number of unsynced items. This provides a clear and persistent visual indicator of the sync status.
+
 ## [1.9.3] - 2025-07-16
 
 ### Added

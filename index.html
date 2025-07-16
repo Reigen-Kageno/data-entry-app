@@ -60,6 +60,15 @@
     .status-synced {
       border: 2px solid #4caf50; /* Green */
     }
+    .badge {
+      background-color: #f44336;
+      color: white;
+      border-radius: 50%;
+      padding: 2px 6px;
+      font-size: 0.8em;
+      margin-left: 8px;
+      display: none; /* Hidden by default */
+    }
   </style>  
   
   <!-- Load MSAL first -->
@@ -229,7 +238,7 @@
     </div>
   </template>
 
-  <button type="button" class="btn" id="manual-sync-btn" style="margin-top: 20px;">Synchroniser Maintenant</button>
+  <button type="button" class="btn" id="manual-sync-btn" style="margin-top: 20px;">Synchroniser Maintenant <span id="unsynced-count-badge" class="badge">0</span></button>
   <button type="button" class="btn" id="save-all-btn" style="margin-top: 20px; background-color: #4CAF50;">Enregistrer les Modifications</button>
   <button type="button" class="btn" id="refresh-data-btn" style="margin-top: 20px; background-color: #f44336;" title="Supprime toutes les données locales et les remplace par les données du serveur. Utiliser en cas de nouvelle installation ou de corruption des données.">Actualiser les données du serveur</button>
 

@@ -42,7 +42,15 @@ function updateSyncButtonState() {
     }
 }
 
-export { updateSyncStatusUI, updateSyncButtonState, updateUnsyncedCount };
+// Checks if the user is admin and shows the admin tab if so
+function checkAdminStatus(account) {
+    if (account && (account.username === config.adminEmail || account.email === config.adminEmail)) {
+        const adminTab = document.getElementById('admin-tab');
+        if (adminTab) adminTab.style.display = 'inline-block';
+    }
+}
+
+export { updateSyncStatusUI, updateSyncButtonState, updateUnsyncedCount, checkAdminStatus };
 
 function getAvailableMachines() {
     return machineOptions.filter(m => !selectedMachines.has(m));
@@ -525,6 +533,8 @@ export function initializeAppUI(masterData) {
     db.on('ready', () => {
         console.log("DB is ready event fired. Automatic initial sync disabled.");
     });
+
+
 
     if (navigator.onLine) {
         updateSyncStatusUI(true, 'En ligne.');

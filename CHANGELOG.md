@@ -2,6 +2,15 @@
 
 This document tracks significant changes and updates to the SOECO Basalt Site Data Entry Application.
 
+## [1.9.7] - 2025-07-17
+
+### Added
+- **Admin Tool for Client Data Cleanup**:
+  - Added a secure, role-based "Admin" tab, visible only to the designated administrator.
+  - Implemented a tool within the Admin tab to fetch all client names from SharePoint, group potential duplicates, and provide an interface for merging them.
+  - This feature allows for efficient cleanup of large datasets directly from the application.
+- **Security Enhancement**: The administrator's email is now managed via a GitHub Secret (`ADMIN_EMAIL`) and injected during the deployment process, preventing it from being exposed in the source code.
+
 ## [1.9.6] - 2025-07-16
 
 ### Added

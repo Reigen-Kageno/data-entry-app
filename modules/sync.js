@@ -1,5 +1,5 @@
 import { db } from './database.js';
-import { getToken } from '../auth.js';
+import { getToken } from './auth.js';
 import config from '../config.global.js';
 import { updateSyncStatusUI, loadEntriesForDate } from './ui.js';
 import { getQueuedDeletions } from './data.js';
@@ -128,6 +128,14 @@ export async function refreshAllDataFromServer() {
         // 4. Refresh the UI with the new data for the current date
         const dateInput = document.getElementById('entry-date');
         await loadEntriesForDate(dateInput.value);
+
+        // 5. Update the unsynced items counter in the UI
+        if (typeof import('./ui.js').then === 'function') {
+            // Dynamic import for safety in case of circular deps
+            (await import('./ui.js')).updateUnsyncedCount();
+        } else if (window.updateUnsyncedCount) {
+            window.updateUnsyncedCount();
+        }
 
     } catch (error) {
         console.error("Failed to refresh data from server:", error);

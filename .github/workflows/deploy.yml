@@ -42,7 +42,8 @@ jobs:
           echo "      ventes: \"${{ secrets.SHAREPOINT_LIST_ID_VENTES }}\"," >> config.global.js
           echo "      production: \"${{ secrets.SHAREPOINT_LIST_ID_PRODUCTION }}\"" >> config.global.js
           echo "    }" >> config.global.js
-          echo "  }" >> config.global.js
+          echo "  }," >> config.global.js
+          echo "  adminEmail: \"${{ secrets.ADMIN_EMAIL }}\"" >> config.global.js
           echo "};" >> config.global.js
           echo "export default config;" >> config.global.js
         env:
@@ -55,6 +56,7 @@ jobs:
           SHAREPOINT_LIST_ID_STOCKCHECKS: ${{ secrets.SHAREPOINT_LIST_ID_STOCKCHECKS }}
           SHAREPOINT_LIST_ID_VENTES: ${{ secrets.SHAREPOINT_LIST_ID_VENTES }}
           SHAREPOINT_LIST_ID_PRODUCTION: ${{ secrets.SHAREPOINT_LIST_ID_PRODUCTION }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
 
       # 2️⃣ Deploy all files (including the generated config.js)
       - name: Deploy to GitHub Pages

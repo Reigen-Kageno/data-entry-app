@@ -77,8 +77,8 @@
   <!-- Then load Dexie -->
   <script src="libs/dexie.min.js"></script>
   
-  <!-- Debug tools -->
-  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+  <!-- Debug tools 
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>-->
 
   <!-- Wait for DOM content to be loaded before loading app modules -->
   <script>
@@ -93,18 +93,23 @@
       // Load application modules
       const auth = document.createElement('script');
       auth.type = 'module';
-      auth.src = 'auth.js';
+      auth.src = 'modules/auth.js';
       document.head.appendChild(auth);
 
       const masterData = document.createElement('script');
       masterData.type = 'module';
-      masterData.src = 'masterData.js';
+      masterData.src = 'modules/masterData.js';
       document.head.appendChild(masterData);
 
       const app = document.createElement('script');
       app.type = 'module';
       app.src = 'app.js';
       document.head.appendChild(app);
+
+      const admin = document.createElement('script');
+      admin.type = 'module';
+      admin.src = 'modules/admin.js';
+      document.head.appendChild(admin);
     });
   </script>
 </head>
@@ -116,6 +121,7 @@
     <button class="tab-btn active" data-tab="ressources">Ressources</button>
     <button class="tab-btn" data-tab="production">Production</button>
     <button class="tab-btn" data-tab="ventes">Ventes</button>
+    <button class="tab-btn" data-tab="admin" id="admin-tab" style="display: none;">Admin</button>
   </div>
 
   <datalist id="machine-list"></datalist>
@@ -148,6 +154,17 @@
     <div id="ventes-totals-container" style="margin-bottom: 16px;"></div>
     <div id="ventes-entries-container"></div>
     <button type="button" class="btn" id="add-vente-btn">+ Ajouter Vente</button>
+  </div>
+
+  <div id="admin" class="tab-content">
+    <h3>Administration</h3>
+    <p>Outils administratifs pour la gestion des données.</p>
+    <div id="admin-tools-container">
+      <h4>Nettoyage de la liste des clients</h4>
+      <p>Cet outil vous aidera à fusionner les noms de clients en double.</p>
+      <button type="button" class="btn" id="start-client-cleanup-btn">Démarrer le nettoyage</button>
+      <div id="client-cleanup-area" style="margin-top: 16px;"></div>
+    </div>
   </div>
   <!-- This p#status will be used by app.js as syncStatus -->
   <p id="syncStatus">Statut de chargement...</p>
@@ -242,6 +259,6 @@
   <button type="button" class="btn" id="save-all-btn" style="margin-top: 20px; background-color: #4CAF50;">Enregistrer les Modifications</button>
   <button type="button" class="btn" id="refresh-data-btn" style="margin-top: 20px; background-color: #f44336;" title="Supprime toutes les données locales et les remplace par les données du serveur. Utiliser en cas de nouvelle installation ou de corruption des données.">Actualiser les données du serveur</button>
 
-<script>eruda.init();</script>
+  <!-- <script>eruda.init();</script> -->
 </body>
 </html>

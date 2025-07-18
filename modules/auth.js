@@ -1,4 +1,4 @@
-import config from './config.global.js';
+import config from '../config.global.js';
 
 // Callback to be triggered on successful authentication
 let onAuthSuccessCallback = null;
@@ -31,6 +31,7 @@ function handleAuthRedirect() {
         .then(response => {
             if (response && response.account) {
                 console.log("User account found after redirect:", response.account.username);
+                window.dispatchEvent(new CustomEvent('auth-success', { detail: { account: response.account } }));
                 if (onAuthSuccessCallback) {
                     onAuthSuccessCallback();
                 }

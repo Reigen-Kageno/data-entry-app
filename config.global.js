@@ -23,6 +23,7 @@ const config = {
       ventes: "3384f5a1-a69a-44e3-bcf7-72ebf37bdf58",
       production: "541bcbae-e063-44b8-b5f9-2d06276446b4"
     }
-  }
+  },
+  adminEmail: "malick.dia@soeco.sn"
 };
 export default config;

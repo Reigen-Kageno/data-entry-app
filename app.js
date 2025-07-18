@@ -1,10 +1,10 @@
 import { db } from './modules/database.js';
 import { RESOURCES } from './modules/constants.js';
 import { generateUUID } from './modules/utils.js';
-import MasterDataManager from './masterData.js';
-import { getToken, setAuthSuccessCallback, msalInstance, handleAuthRedirect } from './auth.js';
+import MasterDataManager from './modules/masterData.js';
+import { getToken, setAuthSuccessCallback, msalInstance, handleAuthRedirect } from './modules/auth.js';
 import { syncQueuedEntries, refreshAllDataFromServer } from './modules/sync.js';
-import { initializeAppUI, updateSyncStatusUI, updateSyncButtonState, loadEntriesForDate } from './modules/ui.js';
+import { initializeAppUI, updateSyncStatusUI, updateSyncButtonState, loadEntriesForDate, checkAdminStatus } from './modules/ui.js';
 
 // Create master data manager instance
 const masterData = new MasterDataManager(db);
@@ -26,9 +26,14 @@ async function startApp() {
     await masterData.initialize();
     console.log("Master data initialized");
 
+
     // Initialize the UI with the data
     initializeAppUI(masterData);
     console.log("Initial UI setup complete");
+
+    // Check admin status after UI is ready
+    const account = msalInstance.getAllAccounts()[0];
+    checkAdminStatus(account);
 
     // Set up the manual sync button
     document.getElementById('manual-sync-btn').addEventListener('click', () => syncQueuedEntries(true, true));

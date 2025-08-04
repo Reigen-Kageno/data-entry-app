@@ -44,6 +44,10 @@ This section details the role of each primary JavaScript file in the application
         *   **Primary Role**: Contains shared helper functions used across the application.
         *   **Responsibilities**: Currently includes a `generateUUID` function.
 
+    *   **`balance.js` (Balance Manager)**
+        *   **Primary Role**: Manages all logic related to client balances.
+        *   **Responsibilities**: Calculates client balances, handles payment entries, and updates the balance display card.
+
 *   **`masterData.js` (Master Data Manager)**
     *   **Primary Role**: **Solely responsible for managing master data, specifically the machine list.**
     *   **Initialization (`initialize()`):**
@@ -199,6 +203,7 @@ graph TD
 *   **`machines`**: Stores master data about machines. Populated and managed by `masterData.js`. Includes `idMachine` (unique identifier), `displayName` (for UI), `active` status, `location`, and `machineType`.
 *   **`ventes`**: Stores sales records. Includes `syncStatus` and `sharepointId`.
 *   **`production`**: Stores production records. Includes `syncStatus` and `sharepointId`.
+*   **`clientPayments`**: Stores client payment records. Includes `syncStatus` and `sharepointId`.
 
 ## 6. Error Handling & Robustness
 

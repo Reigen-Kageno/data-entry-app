@@ -3,6 +3,7 @@ import { RESOURCES } from './constants.js';
 import { generateUUID } from './utils.js';
 import { updateCardStockDisplay, promptForMeasuredStock, clearDailyStockCheckOverrides, getDailyStockCheckOverrides } from './stock.js';
 import { getAllEntriesByDate, deleteEntryAndQueue } from './data.js';
+import { updateClientBalanceCard } from './balance.js';
 import config from '../config.global.js';
 
 // --- Module-scoped UI elements and shared data ---
@@ -676,12 +677,13 @@ async function saveCard(card, entryDate) {
         } else { // vente
             table = db.ventes;
             const clientInput = card.querySelector('[name="client"]');
+            const produitInput = card.querySelector('[name="produit"]');
             const quantiteInput = card.querySelector('[name="quantite"]');
             const montantPayeInput = card.querySelector('[name="montantPaye"]');
             data = {
                 date: entryDate,
                 client: clientInput.value.trim(),
-                produit: card.querySelector('[name="produit"]').value,
+                produit: produitInput.value,
                 quantite: quantiteInput.value.trim(),
                 montantPaye: parseFloat(montantPayeInput.value) || 0,
                 commentaire: card.querySelector('[name="commentaire"]').value.trim(),
@@ -707,13 +709,19 @@ async function saveCard(card, entryDate) {
                     clientInput.classList.remove('invalid');
                 }
             }
+            if (!data.produit) {
+                produitInput.classList.add('invalid');
+                isValid = false;
+            } else {
+                produitInput.classList.remove('invalid');
+            }
             if (!data.quantite) {
                 quantiteInput.classList.add('invalid');
                 isValid = false;
             } else {
                 quantiteInput.classList.remove('invalid');
             }
-            if (isNaN(data.montantPaye) || data.montantPaye <= 0) {
+            if (isNaN(data.montantPaye)) {
                 montantPayeInput.classList.add('invalid');
                 isValid = false;
             } else {
@@ -841,6 +849,7 @@ export async function loadEntriesForDate(dateString) {
     // Update the new totals cards
     updateProductionTotals(production);
     updateVentesTotals(ventes);
+    updateClientBalanceCard('EHD', dateString);
 }
 
 function updateProductionTotals(entries) {
@@ -884,7 +893,8 @@ function updateVentesTotals(entries) {
 
     let productTotalsHtml = '';
     for (const [product, total] of Object.entries(productTotals)) {
-        productTotalsHtml += `<div><strong>${product}:</strong> ${total.toFixed(2)} m³</div>`;
+        const totalInTons = total * 1.5;
+        productTotalsHtml += `<div><strong>${product}:</strong> ${totalInTons.toFixed(2)} tonnes</div>`;
     }
 
     container.innerHTML = `

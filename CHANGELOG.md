@@ -2,6 +2,36 @@
 
 This document tracks significant changes and updates to the SOECO Basalt Site Data Entry Application.
 
+## [1.9.9] - 2025-08-04
+
+### Fixed
+- **Client Balance Calculation**: Fixed a critical bug where the client balance was not being calculated correctly. The balance now correctly reflects the total sales (by summing `montantPaye`) and payments up to the selected date.
+- **JavaScript Error in Balance Module**: Resolved a `ReferenceError` in `modules/balance.js` that occurred when adding a new payment. The module now correctly imports the necessary data functions.
+- **Simplified Balance Card**: The client balance card has been simplified to show only the most essential information: the current balance and the payment made on the selected day.
+- **Cumulative Balance Logic**: Fixed an issue where future payments were affecting the balance of past dates. The calculation now only includes payments made on or before the selected date.
+
+## [1.9.9] - 2025-08-04
+
+### Fixed
+- **Client Balance Calculation**: Fixed a critical bug where the client balance was not being calculated correctly. The balance now correctly reflects the total sales (by summing `montantPaye`) and payments up to the selected date.
+- **JavaScript Error in Balance Module**: Resolved a `ReferenceError` in `modules/balance.js` that occurred when adding a new payment. The module now correctly imports the necessary data functions.
+- **Simplified Balance Card**: The client balance card has been simplified to show only the most essential information: the current balance and the payment made on the selected day.
+- **Cumulative Balance Logic**: Fixed an issue where future payments were affecting the balance of past dates. The calculation now only includes payments made on or before the selected date.
+
+## [1.9.8] - 2025-08-04
+
+### Added
+- **Client Balance Tracking**: Implemented a new feature to track client balances, starting with the client "EHD".
+  - A new `clientPayments` table has been added to the local database (schema version 17) to store client payments.
+  - A new summary card on the "Ventes" tab displays the client's current balance, total sales, and payments made.
+  - The balance card is interactive, allowing users to click to add new payments for the selected day.
+- **Generic Balance Module**: Created a new `modules/balance.js` to encapsulate the balance tracking logic, making it reusable for other clients in the future.
+- **Sync for Client Payments**: The synchronization process has been updated to include the `clientPayments` table, ensuring that payment data is backed up to SharePoint.
+
+### Changed
+- **Ventes Totals in Tons**: The "Total par Produit" summary in the "Ventes" tab now displays the total quantity in tons instead of m³, using a conversion factor of 1.5.
+- **Compulsory Produit Field**: The "Produit" field in the "Ventes" form is now mandatory to ensure data integrity.
+
 ## [1.9.7] - 2025-07-17
 
 ### Added

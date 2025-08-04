@@ -158,3 +158,46 @@ export async function getAllEntriesByDate(dateString) {
     ]);
     return { ressources, production, ventes };
 }
+
+export async function saveClientPayment(paymentData) {
+    try {
+        const existingPayment = await db.clientPayments.where({
+            client: paymentData.client,
+            date: paymentData.date
+        }).first();
+
+        const dataToSave = {
+            ...paymentData,
+            syncStatus: 0,
+            uniqueKey: existingPayment ? existingPayment.uniqueKey : `${paymentData.client}-${paymentData.date}-${Date.now()}`
+        };
+
+        if (existingPayment) {
+            await db.clientPayments.update(existingPayment.id, dataToSave);
+            console.log(`Client payment updated for ${paymentData.client} on ${paymentData.date}`);
+        } else {
+            await db.clientPayments.add(dataToSave);
+            console.log(`Client payment added for ${paymentData.client} on ${paymentData.date}`);
+        }
+    } catch (error) {
+        console.error("Error saving client payment:", error);
+    }
+}
+
+export async function getClientPayments(client) {
+    try {
+        return await db.clientPayments.where('client').equals(client).toArray();
+    } catch (error) {
+        console.error(`Error fetching payments for client ${client}:`, error);
+        return [];
+    }
+}
+
+export async function getClientPaymentsByDate(dateString) {
+    try {
+        return await db.clientPayments.where('date').equals(dateString).toArray();
+    } catch (error) {
+        console.error(`Error fetching client payments for date ${dateString}:`, error);
+        return [];
+    }
+}

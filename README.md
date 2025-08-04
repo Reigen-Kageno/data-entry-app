@@ -4,8 +4,8 @@ This application is designed for SOECO's daily data tracking needs, including re
 
 ## Technical Overview
 
-### Database Schema (Version 15)
-The application now uses a three-tab navigation system (`Ressources`, `Production`, `Ventes`).
+### Database Schema (Version 17)
+The application now uses a three-tab navigation system (`Ressources`, `Production`, `Ventes`) and includes a feature for tracking client balances.
 
 For detailed schema definitions, please refer to `PROJECT_CHARTER.md`.
 

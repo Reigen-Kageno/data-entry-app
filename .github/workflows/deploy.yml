@@ -58,6 +58,8 @@ jobs:
           SHAREPOINT_LIST_ID_STOCKCHECKS: ${{ secrets.SHAREPOINT_LIST_ID_STOCKCHECKS }}
           SHAREPOINT_LIST_ID_VENTES: ${{ secrets.SHAREPOINT_LIST_ID_VENTES }}
           SHAREPOINT_LIST_ID_PRODUCTION: ${{ secrets.SHAREPOINT_LIST_ID_PRODUCTION }}
+          SHAREPOINT_LIST_ID_CLIENTPAYMENTS: ${{ secrets.SHAREPOINT_LIST_ID_CLIENTPAYMENTS }}
+          SHAREPOINT_LIST_ID_DEBLAI: ${{ secrets.SHAREPOINT_LIST_ID_DEBLAI }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
 
       # 2️⃣ Deploy all files (including the generated config.js)

@@ -9,6 +9,7 @@ This document tracks significant changes and updates to the SOECO Basalt Site Da
 - **Deblai Synchronization**: Implemented the missing synchronization logic for `deblai` entries. The `syncQueuedEntries` function now correctly processes and sends `deblai` data to the SharePoint server.
 - **Data Refresh Completeness**: The "Actualiser les données" feature now also fetches and refreshes `deblai` data from the server, ensuring full data consistency.
 - **Post-Sync UI Update**: The unsynced items badge now correctly updates immediately after a synchronization operation, providing real-time feedback.
+- **Data Refresh Stability**: Fixed a `NotFoundError` that occurred during the "Actualiser les données" process by ensuring the `deletionsQueue` table is correctly included in the database transaction.
 
 ## [2.0.0] - 2025-08-04
 

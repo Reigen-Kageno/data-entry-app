@@ -128,7 +128,7 @@ export async function refreshAllDataFromServer() {
 
         // 3. Clear local tables and bulk add new data
         console.log("Clearing local database and inserting new data...");
-        await db.transaction('rw', db.formEntries, db.stockChecks, db.ventes, db.production, db.clientPayments, db.deblai, async () => {
+        await db.transaction('rw', db.formEntries, db.stockChecks, db.ventes, db.production, db.clientPayments, db.deblai, db.deletionsQueue, async () => {
             await Promise.all([
                 db.formEntries.clear(),
                 db.stockChecks.clear(),

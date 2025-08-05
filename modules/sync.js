@@ -50,13 +50,15 @@ export async function refreshAllDataFromServer() {
 
         // 1. Fetch all data from SharePoint
         console.log("Fetching data from SharePoint lists...");
-        const [spFormEntries, spStockChecks, spVentes, spProduction] = await Promise.all([
+        const [spFormEntries, spStockChecks, spVentes, spProduction, spClientPayments, spDeblai] = await Promise.all([
             fetchAllSharePointListItems(token, config.sharePoint.lists.formEntries),
             fetchAllSharePointListItems(token, config.sharePoint.lists.stockChecks),
             fetchAllSharePointListItems(token, config.sharePoint.lists.ventes),
-            fetchAllSharePointListItems(token, config.sharePoint.lists.production)
+            fetchAllSharePointListItems(token, config.sharePoint.lists.production),
+            fetchAllSharePointListItems(token, config.sharePoint.lists.clientPayments),
+            fetchAllSharePointListItems(token, config.sharePoint.lists.deblai)
         ]);
-        console.log(`Fetched: ${spFormEntries.length} form entries, ${spStockChecks.length} stock checks, ${spVentes.length} ventes, ${spProduction.length} production.`);
+        console.log(`Fetched: ${spFormEntries.length} form entries, ${spStockChecks.length} stock checks, ${spVentes.length} ventes, ${spProduction.length} production, ${spClientPayments.length} client payments, ${spDeblai.length} deblai.`);
 
         // 2. Transform SharePoint data to Dexie format
         const formEntries = spFormEntries.map(item => ({
@@ -105,20 +107,44 @@ export async function refreshAllDataFromServer() {
             syncStatus: 1
         }));
 
+        const clientPayments = spClientPayments.map(item => ({
+            uniqueKey: item.fields.Title,
+            client: item.fields.client,
+            date: item.fields.date.split('T')[0],
+            amount: parseFloat(item.fields.amount) || 0,
+            sharepointId: item.id,
+            syncStatus: 1
+        }));
+
+        const deblai = spDeblai.map(item => ({
+            uniqueKey: item.fields.Title,
+            date: item.fields.Date.split('T')[0],
+            idCamion: item.fields.IDCamion,
+            voyages: parseInt(item.fields.Voyages, 10) || 0,
+            commentaire: item.fields.Commentaire,
+            sharepointId: item.id,
+            syncStatus: 1
+        }));
+
         // 3. Clear local tables and bulk add new data
         console.log("Clearing local database and inserting new data...");
-        await db.transaction('rw', db.formEntries, db.stockChecks, db.ventes, db.production, async () => {
+        await db.transaction('rw', db.formEntries, db.stockChecks, db.ventes, db.production, db.clientPayments, db.deblai, async () => {
             await Promise.all([
                 db.formEntries.clear(),
                 db.stockChecks.clear(),
                 db.ventes.clear(),
-                db.production.clear()
+                db.production.clear(),
+                db.clientPayments.clear(),
+                db.deblai.clear(),
+                db.deletionsQueue.clear()
             ]);
             await Promise.all([
                 db.formEntries.bulkAdd(formEntries),
                 db.stockChecks.bulkAdd(stockChecks),
                 db.ventes.bulkAdd(ventes),
-                db.production.bulkAdd(production)
+                db.production.bulkAdd(production),
+                db.clientPayments.bulkAdd(clientPayments),
+                db.deblai.bulkAdd(deblai)
             ]);
         });
 
@@ -312,12 +338,33 @@ export async function syncQueuedEntries(showStatus = true, manualTrigger = false
             }
         });
 
+        const createClientPaymentPayload = (payment) => ({
+            fields: {
+                Title: payment.uniqueKey,
+                client: String(payment.client),
+                date: `${payment.date}T00:00:00Z`,
+                amount: String(payment.amount)
+            }
+        });
+
+        const createDeblaiPayload = (deblai) => ({
+            fields: {
+                Title: deblai.uniqueKey,
+                date: `${deblai.date}T00:00:00Z`,
+                idCamion: String(deblai.idCamion),
+                voyages: String(deblai.voyages),
+                commentaire: String(deblai.commentaire || '')
+            }
+        });
+
         // Run sync for all tables and deletions
         await Promise.all([
             syncTable(token, db.formEntries, config.sharePoint.lists.formEntries, createFormEntryPayload),
             syncTable(token, db.stockChecks, config.sharePoint.lists.stockChecks, createStockCheckPayload, true),
             syncTable(token, db.ventes, config.sharePoint.lists.ventes, createVentePayload),
             syncTable(token, db.production, config.sharePoint.lists.production, createProductionPayload),
+            syncTable(token, db.clientPayments, config.sharePoint.lists.clientPayments, createClientPaymentPayload),
+            syncTable(token, db.deblai, config.sharePoint.lists.deblai, createDeblaiPayload),
             syncDeletions(token)
         ]);
 
@@ -326,7 +373,9 @@ export async function syncQueuedEntries(showStatus = true, manualTrigger = false
         const remainingStockChecks = await db.stockChecks.where('syncStatus').equals(0).count();
         const remainingVentes = await db.ventes.where('syncStatus').equals(0).count();
         const remainingProduction = await db.production.where('syncStatus').equals(0).count();
-        const totalRemaining = remainingEntries + remainingStockChecks + remainingVentes + remainingProduction;
+        const remainingClientPayments = await db.clientPayments.where('syncStatus').equals(0).count();
+        const remainingDeblai = await db.deblai.where('syncStatus').equals(0).count();
+        const totalRemaining = remainingEntries + remainingStockChecks + remainingVentes + remainingProduction + remainingClientPayments + remainingDeblai;
 
         if (totalRemaining > 0) {
             const msg = `Tentative de synchronisation. ${totalRemaining} entrées restantes.`;
@@ -342,6 +391,8 @@ export async function syncQueuedEntries(showStatus = true, manualTrigger = false
         if (dateInput && dateInput.value) {
             await loadEntriesForDate(dateInput.value);
         }
+        
+        (await import('./ui.js')).updateUnsyncedCount();
 
     } catch (error) {
         console.error('Network or other sync error:', error);

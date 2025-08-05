@@ -31,10 +31,7 @@ This document tracks significant changes and updates to the SOECO Basalt Site Da
 - **Simplified Balance Card**: The client balance card has been simplified to show only the most essential information: the current balance and the payment made on the selected day.
 - **Cumulative Balance Logic**: Fixed an issue where future payments were affecting the balance of past dates. The calculation now only includes payments made on or before the selected date.
 
-## [1.9.8] - 2025-07-30
-
-### Fixed
-- … (rest of the existing changelog)## [1.9.8] - 2025-08-04
+## [1.9.8] - 2025-08-04
 
 ### Added
 - **Client Balance Tracking**: Implemented a new feature to track client balances, starting with the client "EHD".

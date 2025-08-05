@@ -794,7 +794,9 @@ async function saveCard(card, entryDate) {
             data.uniqueKey = existing.uniqueKey;
             await table.update(id, data);
         } else {
-            data.uniqueKey = `${cardType}-${data.idCamion || data.client}-${data.date}-${generateUUID()}`;
+            // Use a ternary operator to select the correct identifier
+            const identifier = cardType === 'vente' ? data.client : data.idCamion;
+            data.uniqueKey = `${cardType}-${identifier}-${data.date}-${generateUUID()}`;
             await table.add(data);
         }
     }

@@ -22,7 +22,8 @@ const config = {
       stockChecks: "8f2c2330-3798-46e6-8f59-a889663b7b72",
       ventes: "3384f5a1-a69a-44e3-bcf7-72ebf37bdf58",
       production: "541bcbae-e063-44b8-b5f9-2d06276446b4",
-      clientPayments: "9b461087-b720-4a77-b14f-e006e161d9f0"
+      clientPayments: "9b461087-b720-4a77-b14f-e006e161d9f0",
+      deblai: "080e3534-dce9-4622-b891-1fd7dce60e67"
     }
   },
   adminEmail: "malick.dia@soeco.sn"

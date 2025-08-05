@@ -46,9 +46,10 @@ This section details the role of each primary JavaScript file in the application
 
     *   **`balance.js` (Balance Manager)**
         *   **Primary Role**: Manages all logic related to client balances.
-        *   **Responsibilities**: Calculates client balances, handles payment entries, and updates the balance display card.
-
-*   **`masterData.js` (Master Data Manager)**
+        *   **Responsibilities**:  
+            *   Calculates client balances and formats values for display.  
+            *   Handles creation/editing of **payment** entries **via the `data.js` layer (no direct IndexedDB calls)**.  
+            *   Updates the balance display card and emits UI events when balances change.*   **`masterData.js` (Master Data Manager)**
     *   **Primary Role**: **Solely responsible for managing master data, specifically the machine list.**
     *   **Initialization (`initialize()`):**
         *   Loads existing machine data from IndexedDB cache.
@@ -105,18 +106,18 @@ This flow describes how the UI loads all necessary data for a selected date, dem
 1.  **Date Selection**: The user selects a date in the UI.
 2.  **UI Request**: The `loadEntriesForDate` function in `ui.js` is triggered.
 3.  **Centralized Data Fetch**: `loadEntriesForDate` makes a single call to `getAllEntriesByDate(dateString)` in the `data.js` module.
-4.  **Database Queries**: `getAllEntriesByDate` executes parallel queries to fetch data from the `formEntries`, `production`, and `ventes` tables in IndexedDB for the given date.
-5.  **Data Return**: The `data.js` function returns an object containing arrays of all three entry types (e.g., `{ ressources: [...], production: [...], ventes: [...] }`).
-6.  **UI Population**: Back in `ui.js`, the `loadEntriesForDate` function receives this object and passes the relevant data to its helper functions (`loadRessourcesEntries`, `loadProductionEntries`, `loadVentesEntries`) to populate the UI with the appropriate cards.
+4.  **Database Queries**: `getAllEntriesByDate` executes parallel queries to fetch data from the `formEntries`, `production`, `ventes`, and `deblai` tables in IndexedDB for the given date.
+5.  **Data Return**: The `data.js` function returns an object containing arrays of all four entry types (e.g., `{ ressources: [...], production: [...], ventes: [...], deblai: [...] }`).
+6.  **UI Population**: Back in `ui.js`, the `loadEntriesForDate` function receives this object and passes the relevant data to its helper functions (`loadRessourcesEntries`, `loadProductionEntries`, `loadVentesEntries`, `loadDeblaiEntries`) to populate the UI with the appropriate cards.
 
 ### 3.3. Form Saving and Editing
 
 The application uses a robust "upsert" (update/insert) logic for handling form submissions, managed by a unified `saveCard` function.
 
-1.  **Unified Save Logic (`saveCard`)**: All entry types (`ressource`, `production`, `vente`) are saved through a single `saveCard` function. This function determines the card type, validates the input fields, and prepares the data for saving.
+1.  **Unified Save Logic (`saveCard`)**: All entry types (`ressource`, `production`, `vente`, `deblai`) are saved through a single `saveCard` function. This function determines the card type, validates the input fields, and prepares the data for saving.
 2.  **Unique Key Generation**: When a user saves an entry for the first time, a `uniqueKey` is generated for most tables.
     *   For `formEntries`, this key is composed of the natural data fields (e.g., `${machine}-${resource}-${date}`).
-    *   For `ventes` and `production`, a UUID is appended to the natural key to ensure absolute uniqueness.
+    *   For `ventes`, `production`, and `deblai`, a UUID is appended to the natural key to ensure absolute uniqueness.
     *   The `stockChecks` table does **not** use this system and continues to rely on its `[resourceName+date]` composite primary key for identification.
 3.  **Local Save**: The data, including the `uniqueKey` where applicable, is saved to the local IndexedDB. The `syncStatus` is set to `0` (unsynced).
 4.  **Editing**: When a user edits an existing entry, the application updates the record in the local database. The `uniqueKey` remains unchanged, ensuring a stable identifier for the life of the entry.
@@ -130,7 +131,7 @@ The synchronization process is designed to be robust and prevent duplicate entri
 2.  **Token Acquisition**: Gets an access token from `auth.js`.
 3.  **Local Data Retrieval**: Fetches all records where `syncStatus` is `0` from all data tables.
 4.  **SharePoint Upload (per table)**: The generic `syncTable` function handles the logic for each table, employing a hybrid strategy.
-    *   **For `formEntries`, `ventes`, and `production` (Unique Key Strategy)**:
+    *   **For `formEntries`, `ventes`, `production`, and `deblai` (Unique Key Strategy)**:
         *   **Check for Existence**: For each local item, it queries the SharePoint list, filtering the `Title` field by the item's `uniqueKey`.
         *   **`PATCH` or `POST`**: If the query returns an existing SharePoint item, it performs a `PATCH` request; otherwise, it performs a `POST` request, using the `uniqueKey` as the `Title`.
     *   **For `stockChecks` (Special Case)**:
@@ -147,7 +148,7 @@ This flow allows for a complete refresh of local data from the SharePoint server
 1.  **Trigger**: The user clicks the "Actualiser les données du serveur" button.
 2.  **Confirmation**: A confirmation dialog is shown to prevent accidental data loss.
 3.  **Token Acquisition**: An access token is obtained from `auth.js`.
-4.  **Fetch All Data**: The `fetchAllSharePointListItems` helper function is called for each data list (`formEntries`, `stockChecks`, `ventes`, `production`). This function handles pagination to ensure all records are retrieved.
+4.  **Fetch All Data**: The `fetchAllSharePointListItems` helper function is called for each data list (`formEntries`, `stockChecks`, `ventes`, `production`, `deblai`). This function handles pagination to ensure all records are retrieved.
 5.  **Data Transformation**: The fetched SharePoint data is mapped to the local Dexie.js schema.
 6.  **Atomic Database Update**: A Dexie transaction is used to perform the following operations atomically:
     *   `clear()` is called on each local data table.
@@ -202,9 +203,19 @@ graph TD
 *   **`stockChecks`**: Stores daily stock measurements. Uses a compound primary key `[resourceName+date]` and includes `syncStatus` and `sharepointId`.
 *   **`machines`**: Stores master data about machines. Populated and managed by `masterData.js`. Includes `idMachine` (unique identifier), `displayName` (for UI), `active` status, `location`, and `machineType`.
 *   **`ventes`**: Stores sales records. Includes `syncStatus` and `sharepointId`.
-*   **`production`**: Stores production records. Includes `syncStatus` and `sharepointId`.
-*   **`clientPayments`**: Stores client payment records. Includes `syncStatus` and `sharepointId`.
+### 3.3 Data Synchronisation
 
+…  
+-    *   **For `formEntries`, `ventes`, and `production` (Unique Key Strategy)**:  
++    *   **For `formEntries`, `ventes`, `production`, and `clientPayments` (Unique Key Strategy)**:  
+…
+
+### 3.4 Data Refresh from Server
+
+…  
+-4.  **Fetch All Data**: … for each data list (`formEntries`, `stockChecks`, `ventes`, `production`).  
++4.  **Fetch All Data**: … for each data list (`formEntries`, `stockChecks`, `ventes`, `production`, `clientPayments`).  
+…
 ## 6. Error Handling & Robustness
 
 *   **Network Retries**: `masterData.js` implements retries for SharePoint API calls.

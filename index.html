@@ -33,7 +33,7 @@
     .tab-btn.active { background: #fff; border-bottom: 1px solid #fff; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
-    .production-card, .ventes-card, .ressource-card {
+    .production-card, .ventes-card, .ressource-card, .deblai-card {
       position: relative;
       border: 1px solid #ccc;
       padding: 12px;
@@ -149,9 +149,14 @@
 
   <div id="production" class="tab-content">
     <h3>Production</h3>
-    <div id="production-totals-container" style="margin-bottom: 16px;"></div>
+    <div id="production-totals-container" style="margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
     <div id="production-entries-container"></div>
     <button type="button" class="btn" id="add-production-btn">+ Ajouter Production</button>
+    <hr style="margin: 20px 0;">
+    <h3>Déblai</h3>
+    <div id="deblai-totals-container" style="margin-bottom: 16px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
+    <div id="deblai-entries-container"></div>
+    <button type="button" class="btn" id="add-deblai-btn">+ Ajouter Déblai</button>
   </div>
 
   <div id="ventes" class="tab-content">
@@ -228,6 +233,7 @@
       <input type="checkbox" class="entry-checkbox" style="position: absolute; top: 10px; right: 10px;">
       <label>ID Camion: <input type="text" name="idCamion" list="truck-list" required autocomplete="off" style="width: 100%;"></label>
       <label>Poids (tonnes): <input type="number" name="poids" step="0.01" required style="width: 100%;"></label>
+      <label>Nombre de voyages: <input type="number" name="voyages" value="1" step="1" required style="width: 100%;"></label>
       <label>Origine:
         <select name="origine" required style="width: 100%;">
           <option value="Extraction">Extraction</option>
@@ -240,6 +246,15 @@
           <option value="Stockage">Stockage</option>
         </select>
       </label>
+      <label>Commentaire: <textarea name="commentaire" rows="2" style="width: 100%;"></textarea></label>
+    </div>
+  </template>
+
+  <template id="deblai-card-template">
+    <div class="deblai-card status-new">
+      <input type="checkbox" class="entry-checkbox" style="position: absolute; top: 10px; right: 10px;">
+      <label>ID Camion: <input type="text" name="idCamion" list="truck-list" required autocomplete="off" style="width: 100%;"></label>
+      <label>Nombre de voyages: <input type="number" name="voyages" value="1" step="1" required style="width: 100%;"></label>
       <label>Commentaire: <textarea name="commentaire" rows="2" style="width: 100%;"></textarea></label>
     </div>
   </template>

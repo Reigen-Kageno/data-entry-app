@@ -2,6 +2,27 @@
 
 This document tracks significant changes and updates to the SOECO Basalt Site Data Entry Application.
 
+## [2.0.1] - 2025-08-05
+
+### Fixed
+- **Unsynced Count Accuracy**: Fixed a bug where the unsynced items badge was not accurately counting all entry types. The count now includes `deblai` and `clientPayments` entries, providing a correct total of all unsynced data.
+- **Deblai Synchronization**: Implemented the missing synchronization logic for `deblai` entries. The `syncQueuedEntries` function now correctly processes and sends `deblai` data to the SharePoint server.
+- **Data Refresh Completeness**: The "Actualiser les données" feature now also fetches and refreshes `deblai` data from the server, ensuring full data consistency.
+- **Post-Sync UI Update**: The unsynced items badge now correctly updates immediately after a synchronization operation, providing real-time feedback.
+
+## [2.0.0] - 2025-08-04
+
+### Added
+- **Voyages Multiplier**: Added a "voyages" multiplier to production entries, allowing operators to log multiple trips with a single entry.
+- **Categorized Production Totals**: Implemented categorized production totals, separating "Concassage," "Extraction," and "Stockage" for more detailed analysis.
+- **Separated Average Weight**: The average weight is now calculated and displayed separately for "Concassage" and "Extraction".
+- **Stock Restant**: A new "Stock Restant" total has been added to show the net change in stock for the day.
+- **Deblai Tracking**: Implemented a new system for tracking "deblai" voyages, which are not weighted but are important for operational analysis.
+
+### Changed
+- **Database Schema**: Upgraded the database to version 18 to include the `voyages` field in the `production` table and add the new `deblai` table.
+- **UI**: The production tab has been updated to include the new fields and totals.
+
 ## [1.9.9] - 2025-08-04
 
 ### Fixed
@@ -10,15 +31,10 @@ This document tracks significant changes and updates to the SOECO Basalt Site Da
 - **Simplified Balance Card**: The client balance card has been simplified to show only the most essential information: the current balance and the payment made on the selected day.
 - **Cumulative Balance Logic**: Fixed an issue where future payments were affecting the balance of past dates. The calculation now only includes payments made on or before the selected date.
 
-## [1.9.9] - 2025-08-04
+## [1.9.8] - 2025-07-30
 
 ### Fixed
-- **Client Balance Calculation**: Fixed a critical bug where the client balance was not being calculated correctly. The balance now correctly reflects the total sales (by summing `montantPaye`) and payments up to the selected date.
-- **JavaScript Error in Balance Module**: Resolved a `ReferenceError` in `modules/balance.js` that occurred when adding a new payment. The module now correctly imports the necessary data functions.
-- **Simplified Balance Card**: The client balance card has been simplified to show only the most essential information: the current balance and the payment made on the selected day.
-- **Cumulative Balance Logic**: Fixed an issue where future payments were affecting the balance of past dates. The calculation now only includes payments made on or before the selected date.
-
-## [1.9.8] - 2025-08-04
+- … (rest of the existing changelog)## [1.9.8] - 2025-08-04
 
 ### Added
 - **Client Balance Tracking**: Implemented a new feature to track client balances, starting with the client "EHD".

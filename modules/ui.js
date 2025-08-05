@@ -14,6 +14,7 @@ let syncStatusElement;
 let addRessourceBtn;
 let addProductionBtn;
 let addVenteBtn;
+let addDeblaiBtn;
 let saveAllBtn;
 let machineOptions = []; // This array holds the machine options for datalists
 const selectedMachines = new Set(); // Tracks selected machines for the current date
@@ -219,16 +220,32 @@ function createProductionCard(entry = {}) {
         selectors: {
             idCamion: '[name="idCamion"]',
             poids: '[name="poids"]',
+            voyages: '[name="voyages"]',
             origine: '[name="origine"]',
             destination: '[name="destination"]',
             commentaire: '[name="commentaire"]'
         },
         defaults: {
             origine: 'Extraction',
-            destination: 'Concassage'
+            destination: 'Concassage',
+            voyages: 1
         }
     };
     return createCard('production-card-template', entry, fieldConfig);
+}
+
+function createDeblaiCard(entry = {}) {
+    const fieldConfig = {
+        selectors: {
+            idCamion: '[name="idCamion"]',
+            voyages: '[name="voyages"]',
+            commentaire: '[name="commentaire"]'
+        },
+        defaults: {
+            voyages: 1
+        }
+    };
+    return createCard('deblai-card-template', entry, fieldConfig);
 }
 
 function createVenteCard(entry = {}) {
@@ -296,6 +313,17 @@ async function loadVentesEntries(dateString, entries) {
   });
 }
 
+async function loadDeblaiEntries(dateString, entries) {
+    const container = document.getElementById('deblai-entries-container');
+    if (!container) return;
+    container.innerHTML = '';
+    entries.forEach(entry => {
+        const card = createDeblaiCard(entry);
+        container.appendChild(card);
+        setCardReadOnly(card, true, entry.syncStatus);
+    });
+}
+
 async function loadRessourcesEntries(dateString, entries) {
     const container = document.getElementById('ressources-entries-container');
     if (!container) return;
@@ -348,6 +376,7 @@ export function initializeAppUI(masterData) {
     addRessourceBtn = document.getElementById('add-ressource-btn');
     addProductionBtn = document.getElementById('add-production-btn');
     addVenteBtn = document.getElementById('add-vente-btn');
+    addDeblaiBtn = document.getElementById('add-deblai-btn');
     saveAllBtn = document.getElementById('save-all-btn');
     
     const DEFAULT_FALLBACK_MACHINES = ['EXC-300', 'BULL-24', 'CRANE-12'];
@@ -440,6 +469,13 @@ export function initializeAppUI(masterData) {
         setCardReadOnly(card, false, -1);
     };
 
+    addDeblaiBtn.onclick = () => {
+        const container = document.getElementById('deblai-entries-container');
+        const card = createDeblaiCard();
+        container.appendChild(card);
+        setCardReadOnly(card, false, -1);
+    };
+
     RESOURCES.forEach(r => {
         const card = document.createElement('div');
         card.className = 'stock-card';
@@ -469,10 +505,10 @@ export function initializeAppUI(masterData) {
         let changesMade = false;
         let allFormsValid = true;
 
-        const containers = ['ressources-entries-container', 'production-entries-container', 'ventes-entries-container'];
+        const containers = ['ressources-entries-container', 'production-entries-container', 'ventes-entries-container', 'deblai-entries-container'];
         for (const containerId of containers) {
             const container = document.getElementById(containerId);
-            const cards = container.querySelectorAll('.ressource-card, .production-card, .ventes-card');
+            const cards = container.querySelectorAll('.ressource-card, .production-card, .ventes-card, .deblai-card');
             for (const card of cards) {
                 if (card.classList.contains('card-readonly')) continue;
 
@@ -551,6 +587,7 @@ export function initializeAppUI(masterData) {
 async function saveCard(card, entryDate) {
     const cardType = card.classList.contains('ressource-card') ? 'ressource' :
                      card.classList.contains('production-card') ? 'production' :
+                     card.classList.contains('deblai-card') ? 'deblai' :
                      'vente';
     const id = card.dataset.id ? parseInt(card.dataset.id, 10) : null;
 
@@ -648,31 +685,52 @@ async function saveCard(card, entryDate) {
             }
         }
 
-    } else { // Production and Vente logic remains simpler
+    } else { // Production, Vente, and Deblai logic
         let data;
         let table;
         if (cardType === 'production') {
             table = db.production;
             const idCamionInput = card.querySelector('[name="idCamion"]');
             const poidsInput = card.querySelector('[name="poids"]');
+            const voyagesInput = card.querySelector('[name="voyages"]');
             data = {
                 date: entryDate,
                 idCamion: idCamionInput.value.trim(),
                 poids: parseFloat(poidsInput.value),
+                voyages: parseInt(voyagesInput.value, 10) || 1,
                 origine: card.querySelector('[name="origine"]').value,
                 destination: card.querySelector('[name="destination"]').value,
                 commentaire: card.querySelector('[name="commentaire"]').value.trim(),
                 syncStatus: 0
             };
-            if (!data.idCamion || isNaN(data.poids) || data.poids <= 0) {
+            if (!data.idCamion || isNaN(data.poids) || data.poids <= 0 || data.voyages <= 0) {
                 isValid = false;
-                if (!data.idCamion) idCamionInput.classList.add('invalid');
-                else idCamionInput.classList.remove('invalid');
-                if (isNaN(data.poids) || data.poids <= 0) poidsInput.classList.add('invalid');
-                else poidsInput.classList.remove('invalid');
+                if (!data.idCamion) idCamionInput.classList.add('invalid'); else idCamionInput.classList.remove('invalid');
+                if (isNaN(data.poids) || data.poids <= 0) poidsInput.classList.add('invalid'); else poidsInput.classList.remove('invalid');
+                if (data.voyages <= 0) voyagesInput.classList.add('invalid'); else voyagesInput.classList.remove('invalid');
             } else {
                 idCamionInput.classList.remove('invalid');
                 poidsInput.classList.remove('invalid');
+                voyagesInput.classList.remove('invalid');
+            }
+        } else if (cardType === 'deblai') {
+            table = db.deblai;
+            const idCamionInput = card.querySelector('[name="idCamion"]');
+            const voyagesInput = card.querySelector('[name="voyages"]');
+            data = {
+                date: entryDate,
+                idCamion: idCamionInput.value.trim(),
+                voyages: parseInt(voyagesInput.value, 10) || 1,
+                commentaire: card.querySelector('[name="commentaire"]').value.trim(),
+                syncStatus: 0
+            };
+            if (!data.idCamion || data.voyages <= 0) {
+                isValid = false;
+                if (!data.idCamion) idCamionInput.classList.add('invalid'); else idCamionInput.classList.remove('invalid');
+                if (data.voyages <= 0) voyagesInput.classList.add('invalid'); else voyagesInput.classList.remove('invalid');
+            } else {
+                idCamionInput.classList.remove('invalid');
+                voyagesInput.classList.remove('invalid');
             }
         } else { // vente
             table = db.ventes;
@@ -736,7 +794,7 @@ async function saveCard(card, entryDate) {
             data.uniqueKey = existing.uniqueKey;
             await table.update(id, data);
         } else {
-            data.uniqueKey = cardType === 'production' ? `${data.idCamion}-${data.date}-${generateUUID()}` : `${data.client}-${data.produit}-${data.date}-${generateUUID()}`;
+            data.uniqueKey = `${cardType}-${data.idCamion || data.client}-${data.date}-${generateUUID()}`;
             await table.add(data);
         }
     }
@@ -748,7 +806,7 @@ function toggleEditMode(isEditing) {
     const editDayBtn = document.getElementById('edit-day-btn');
     const deleteSelectedBtn = document.getElementById('delete-selected-btn');
     const saveAllBtn = document.getElementById('save-all-btn');
-    const allCards = document.querySelectorAll('.ressource-card, .production-card, .ventes-card');
+    const allCards = document.querySelectorAll('.ressource-card, .production-card, .ventes-card, .deblai-card');
 
     if (isEditing) {
         editDayBtn.textContent = 'Enregistrer les Modifications';
@@ -781,13 +839,14 @@ async function handleDeleteSelection() {
 
     if (confirm(`Êtes-vous sûr de vouloir supprimer les ${selectedCheckboxes.length} entrées sélectionnées ?`)) {
         for (const cb of selectedCheckboxes) {
-            const card = cb.closest('.ressource-card, .production-card, .ventes-card');
+            const card = cb.closest('.ressource-card, .production-card, .ventes-card, .deblai-card');
             if (card) {
                 const id = parseInt(card.dataset.id, 10);
                 let tableName;
                 if (card.classList.contains('ressource-card')) tableName = 'formEntries';
                 else if (card.classList.contains('production-card')) tableName = 'production';
                 else if (card.classList.contains('ventes-card')) tableName = 'ventes';
+                else if (card.classList.contains('deblai-card')) tableName = 'deblai';
 
                 if (id && tableName) {
                      const listName = config.sharePoint.lists[tableName];
@@ -821,6 +880,8 @@ export async function loadEntriesForDate(dateString) {
     if (productionContainer) productionContainer.innerHTML = '';
     const ventesContainer = document.getElementById('ventes-entries-container');
     if (ventesContainer) ventesContainer.innerHTML = '';
+    const deblaiContainer = document.getElementById('deblai-entries-container');
+    if (deblaiContainer) deblaiContainer.innerHTML = '';
 
     clearTrackingSets();
     const dailyStockCheckOverrides = getDailyStockCheckOverrides();
@@ -828,9 +889,9 @@ export async function loadEntriesForDate(dateString) {
         dailyStockCheckOverrides[dateString] = {};
     }
 
-    const { ressources, production, ventes } = await getAllEntriesByDate(dateString);
+    const { ressources, production, ventes, deblai } = await getAllEntriesByDate(dateString);
 
-    if (ressources.length === 0 && production.length === 0 && ventes.length === 0) {
+    if (ressources.length === 0 && production.length === 0 && ventes.length === 0 && deblai.length === 0) {
         if(syncStatusElement) syncStatusElement.textContent = `Pas de données pour ${dateString}. Prêt pour une nouvelle saisie.`;
     } else {
         if(syncStatusElement) syncStatusElement.textContent = `Affichage des entrées pour ${dateString}.`;
@@ -840,6 +901,7 @@ export async function loadEntriesForDate(dateString) {
     await loadRessourcesEntries(dateString, ressources);
     await loadProductionEntries(dateString, production);
     await loadVentesEntries(dateString, ventes);
+    await loadDeblaiEntries(dateString, deblai);
 
     // After loading entries, refresh all stock cards for the new date
     RESOURCES.forEach(resource => {
@@ -849,29 +911,69 @@ export async function loadEntriesForDate(dateString) {
     // Update the new totals cards
     updateProductionTotals(production);
     updateVentesTotals(ventes);
-    updateClientBalanceCard('EHD', dateString);
+    updateDeblaiTotals(deblai);
+    updateClientBalanceCard('EHD', dateString, ventes);
 }
 
 function updateProductionTotals(entries) {
     const container = document.getElementById('production-totals-container');
     if (!container) return;
 
-    const totalWeight = entries.reduce((sum, entry) => sum + (entry.poids || 0), 0);
-    const tripCount = entries.length;
-    const averageWeight = tripCount > 0 ? totalWeight / tripCount : 0;
+    const concassageEntries = entries.filter(e => e.destination === 'Concassage');
+    const extractionEntries = entries.filter(e => e.origine === 'Extraction');
+    const stockageEntries = entries.filter(e => e.destination === 'Stockage');
+    const stockOutEntries = entries.filter(e => e.origine === 'Stockage' && e.destination === 'Concassage');
+
+    const totalWeightConcassage = concassageEntries.reduce((sum, e) => sum + (e.poids * (e.voyages || 1)), 0);
+    const totalTripsConcassage = concassageEntries.reduce((sum, e) => sum + (e.voyages || 1), 0);
+    const avgWeightConcassage = totalTripsConcassage > 0 ? totalWeightConcassage / totalTripsConcassage : 0;
+
+    const totalWeightExtraction = extractionEntries.reduce((sum, e) => sum + (e.poids * (e.voyages || 1)), 0);
+    const totalTripsExtraction = extractionEntries.reduce((sum, e) => sum + (e.voyages || 1), 0);
+    const avgWeightExtraction = totalTripsExtraction > 0 ? totalWeightExtraction / totalTripsExtraction : 0;
+
+    const totalWeightStockage = stockageEntries.reduce((sum, e) => sum + (e.poids * (e.voyages || 1)), 0);
+    const totalWeightStockOut = stockOutEntries.reduce((sum, e) => sum + (e.poids * (e.voyages || 1)), 0);
+    const stockRestant = totalWeightStockage - totalWeightStockOut;
 
     container.innerHTML = `
         <div class="stock-card">
-            <span class="resource-name">Poids Total</span>
-            <div class="stock-value">${totalWeight.toFixed(2)} t</div>
+            <span class="resource-name">Total Concassage</span>
+            <div class="stock-value">${totalWeightConcassage.toFixed(2)} t</div>
         </div>
         <div class="stock-card">
-            <span class="resource-name">Nb. Voyages</span>
-            <div class="stock-value">${tripCount}</div>
+            <span class="resource-name">Poids Moyen Concassage</span>
+            <div class="stock-value">${avgWeightConcassage.toFixed(2)} t</div>
         </div>
         <div class="stock-card">
-            <span class="resource-name">Poids Moyen</span>
-            <div class="stock-value">${averageWeight.toFixed(2)} t</div>
+            <span class="resource-name">Total Extraction</span>
+            <div class="stock-value">${totalWeightExtraction.toFixed(2)} t</div>
+        </div>
+        <div class="stock-card">
+            <span class="resource-name">Poids Moyen Extraction</span>
+            <div class="stock-value">${avgWeightExtraction.toFixed(2)} t</div>
+        </div>
+        <div class="stock-card">
+            <span class="resource-name">Total Stockage</span>
+            <div class="stock-value">${totalWeightStockage.toFixed(2)} t</div>
+        </div>
+        <div class="stock-card">
+            <span class="resource-name">Stock Restant</span>
+            <div class="stock-value">${stockRestant.toFixed(2)} t</div>
+        </div>
+    `;
+}
+
+function updateDeblaiTotals(entries) {
+    const container = document.getElementById('deblai-totals-container');
+    if (!container) return;
+
+    const totalVoyages = entries.reduce((sum, entry) => sum + (entry.voyages || 1), 0);
+
+    container.innerHTML = `
+        <div class="stock-card">
+            <span class="resource-name">Total Voyages Déblai</span>
+            <div class="stock-value">${totalVoyages}</div>
         </div>
     `;
 }
@@ -921,7 +1023,9 @@ async function updateUnsyncedCount() {
         db.formEntries.where('syncStatus').equals(0).count(),
         db.production.where('syncStatus').equals(0).count(),
         db.ventes.where('syncStatus').equals(0).count(),
-        db.stockChecks.where('syncStatus').equals(0).count()
+        db.stockChecks.where('syncStatus').equals(0).count(),
+        db.deblai.where('syncStatus').equals(0).count(),
+        db.clientPayments.where('syncStatus').equals(0).count()
     ]);
 
     const totalUnsynced = counts.reduce((sum, count) => sum + count, 0);

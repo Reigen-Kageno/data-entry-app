@@ -150,35 +150,49 @@ export async function getVentesByDate(dateString) {
   }
 }
 
+export async function getDeblaiByDate(dateString) {
+  try {
+    const entries = await db.deblai.where('date').equals(dateString).toArray();
+    console.log(`Deblai entries for date ${dateString}:`, entries);
+    return entries;
+  } catch (error) {
+    console.error(`Error fetching deblai entries for date ${dateString}:`, error);
+    return [];
+  }
+}
+
 export async function getAllEntriesByDate(dateString) {
-    const [ressources, production, ventes] = await Promise.all([
+    const [ressources, production, ventes, deblai] = await Promise.all([
         getRessourcesByDate(dateString),
         getProductionByDate(dateString),
-        getVentesByDate(dateString)
+        getVentesByDate(dateString),
+        getDeblaiByDate(dateString)
     ]);
-    return { ressources, production, ventes };
+    return { ressources, production, ventes, deblai };
 }
 
 export async function saveClientPayment(paymentData) {
     try {
-        const existingPayment = await db.clientPayments.where({
-            client: paymentData.client,
-            date: paymentData.date
-        }).first();
+        await db.transaction('rw', db.clientPayments, async () => {
+            const existingPayment = await db.clientPayments.where({
+                client: paymentData.client,
+                date: paymentData.date
+            }).first();
 
-        const dataToSave = {
-            ...paymentData,
-            syncStatus: 0,
-            uniqueKey: existingPayment ? existingPayment.uniqueKey : `${paymentData.client}-${paymentData.date}-${Date.now()}`
-        };
+            const dataToSave = {
+                ...paymentData,
+                syncStatus: 0,
+                uniqueKey: existingPayment ? existingPayment.uniqueKey : `${paymentData.client}-${paymentData.date}-${Date.now()}`
+            };
 
-        if (existingPayment) {
-            await db.clientPayments.update(existingPayment.id, dataToSave);
-            console.log(`Client payment updated for ${paymentData.client} on ${paymentData.date}`);
-        } else {
-            await db.clientPayments.add(dataToSave);
-            console.log(`Client payment added for ${paymentData.client} on ${paymentData.date}`);
-        }
+            if (existingPayment) {
+                await db.clientPayments.update(existingPayment.id, dataToSave);
+                console.log(`Client payment updated for ${paymentData.client} on ${paymentData.date}`);
+            } else {
+                await db.clientPayments.add(dataToSave);
+                console.log(`Client payment added for ${paymentData.client} on ${paymentData.date}`);
+            }
+        });
     } catch (error) {
         console.error("Error saving client payment:", error);
     }

@@ -41,7 +41,8 @@ jobs:
           echo "      stockChecks: \"${{ secrets.SHAREPOINT_LIST_ID_STOCKCHECKS }}\"," >> config.global.js
           echo "      ventes: \"${{ secrets.SHAREPOINT_LIST_ID_VENTES }}\"," >> config.global.js
           echo "      production: \"${{ secrets.SHAREPOINT_LIST_ID_PRODUCTION }}\"," >> config.global.js
-          echo "      clientPayments: \"${{ secrets.SHAREPOINT_LIST_ID_CLIENTPAYMENTS }}\"" >> config.global.js
+          echo "      clientPayments: \"${{ secrets.SHAREPOINT_LIST_ID_CLIENTPAYMENTS }}\"," >> config.global.js
+          echo "      deblai: \"${{ secrets.SHAREPOINT_LIST_ID_DEBLAI }}\"" >> config.global.js
           echo "    }" >> config.global.js
           echo "  }," >> config.global.js
           echo "  adminEmail: \"${{ secrets.ADMIN_EMAIL }}\"" >> config.global.js

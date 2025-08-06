@@ -52,7 +52,17 @@ function checkAdminStatus(account) {
     }
 }
 
-export { updateSyncStatusUI, updateSyncButtonState, updateUnsyncedCount, checkAdminStatus };
+export { updateSyncStatusUI, updateSyncButtonState, updateUnsyncedCount, checkAdminStatus, applySyncStatusClass };
+
+function applySyncStatusClass(element, syncStatus) {
+    if (!element) return;
+    element.classList.remove('status-synced', 'status-saved');
+    if (syncStatus === 1) {
+        element.classList.add('status-synced');
+    } else if (syncStatus === 0) {
+        element.classList.add('status-saved');
+    }
+}
 
 function getAvailableMachines() {
     return machineOptions.filter(m => !selectedMachines.has(m));
@@ -281,11 +291,7 @@ function setCardReadOnly(card, isReadOnly, syncStatus) {
     card.classList.remove('status-new', 'status-saved', 'status-synced', 'card-readonly');
     if (isReadOnly) {
         card.classList.add('card-readonly');
-        if (syncStatus === 1) {
-            card.classList.add('status-synced');
-        } else {
-            card.classList.add('status-saved');
-        }
+        applySyncStatusClass(card, syncStatus);
     } else {
         card.classList.add('status-new');
     }
@@ -845,14 +851,19 @@ async function handleDeleteSelection() {
             if (card) {
                 const id = parseInt(card.dataset.id, 10);
                 let tableName;
-                if (card.classList.contains('ressource-card')) tableName = 'formEntries';
-                else if (card.classList.contains('production-card')) tableName = 'production';
-                else if (card.classList.contains('ventes-card')) tableName = 'ventes';
-                else if (card.classList.contains('deblai-card')) tableName = 'deblai';
+                if (card.classList.contains('ressource-card')) {
+                    tableName = 'formEntries';
+                } else if (card.classList.contains('production-card')) {
+                    tableName = 'production';
+                } else if (card.classList.contains('ventes-card')) {
+                    tableName = 'ventes';
+                } else if (card.classList.contains('deblai-card')) {
+                    tableName = 'deblai';
+                }
 
                 if (id && tableName) {
-                     const listName = config.sharePoint.lists[tableName];
-                     await deleteEntryAndQueue(tableName, listName, id);
+                    const listName = config.sharePoint.lists[tableName];
+                    await deleteEntryAndQueue(tableName, listName, id);
                 }
             }
         }

@@ -1,5 +1,6 @@
 import { db } from './database.js';
-import { saveClientPayment, getClientPayments, getAllEntriesByDate } from './data.js';
+import { saveClientPayment, getClientPayments } from './data.js';
+import { applySyncStatusClass } from './ui.js';
 
 async function updateClientBalanceCard(client, forDate) {
     const container = document.getElementById('ehd-balance-container');
@@ -17,15 +18,24 @@ async function updateClientBalanceCard(client, forDate) {
     const paymentToday = payments.find(p => p.date === forDate);
     const dailyPaidAmount = paymentToday ? paymentToday.amount : 0;
 
+    const ventesToday = allVentes.filter(v => v.date === forDate);
+    const dailySoldAmount = ventesToday.reduce((sum, entry) => sum + (entry.montantPaye || 0), 0);
+
     container.innerHTML = `
         <div class="stock-card" id="ehd-balance-card" data-client="${client}">
             <span class="resource-name">${client} Balance</span>
             <div class="stock-value">${balance.toLocaleString('fr-FR')} CFA</div>
             <div class="measured-stock-display">Payé Aujourd'hui: ${dailyPaidAmount.toLocaleString('fr-FR')}</div>
+            <div class="stock-delta">Ventes Aujourd'hui: ${dailySoldAmount.toLocaleString('fr-FR')}</div>
         </div>
     `;
 
-    document.getElementById('ehd-balance-card').addEventListener('click', () => {
+    const cardElement = document.getElementById('ehd-balance-card');
+    if (paymentToday) {
+        applySyncStatusClass(cardElement, paymentToday.syncStatus);
+    }
+
+    cardElement.addEventListener('click', () => {
         promptForClientPayment(client, forDate);
     });
 }

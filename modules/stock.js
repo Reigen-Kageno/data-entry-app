@@ -1,5 +1,6 @@
 import { db } from './database.js';
 import { getRessourcesByDate } from './data.js';
+import { applySyncStatusClass } from './ui.js';
 
 let dailyStockCheckOverrides = {};
 
@@ -129,6 +130,13 @@ export const updateCardStockDisplay = async function(resourceName, forDate) {
 
     const deltaEl = cardElement.querySelector('.stock-delta');
     if (deltaEl) deltaEl.textContent = `Δ Aujourd'hui : +${sumDeliveriesToday.toFixed(1)} | -${sumUsagesToday.toFixed(1)}`;
+
+    const todayStockCheck = await db.stockChecks.get([resourceName, forDate]);
+    if (todayStockCheck) {
+        applySyncStatusClass(cardElement, todayStockCheck.syncStatus);
+    } else {
+        applySyncStatusClass(cardElement, -1); // No status to show
+    }
 }
 
 async function handleSaveStockCheck(resourceName, cardElement, quantityOnHand) {

@@ -1,4 +1,5 @@
 import { db } from './database.js';
+import { generateUniqueKey } from './utils.js';
 
 /**
  * Checks if a form entry with the same uniqueKey already exists.
@@ -182,7 +183,7 @@ export async function saveClientPayment(paymentData) {
             const dataToSave = {
                 ...paymentData,
                 syncStatus: 0,
-                uniqueKey: existingPayment ? existingPayment.uniqueKey : `${paymentData.client}-${paymentData.date}-${Date.now()}`
+                uniqueKey: existingPayment ? existingPayment.uniqueKey : generateUniqueKey('clientPayment', paymentData.client, paymentData.date)
             };
 
             if (existingPayment) {

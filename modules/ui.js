@@ -1,6 +1,6 @@
 import { db } from './database.js';
 import { RESOURCES } from './constants.js';
-import { generateUUID } from './utils.js';
+import { generateUUID, generateUniqueKey } from './utils.js';
 import { updateCardStockDisplay, promptForMeasuredStock, clearDailyStockCheckOverrides, getDailyStockCheckOverrides } from './stock.js';
 import { getAllEntriesByDate, deleteEntryAndQueue } from './data.js';
 import { updateClientBalanceCard } from './balance.js';
@@ -654,7 +654,7 @@ async function saveCard(card, entryDate) {
                 compteurMoteurFin: compteurFin,
                 notes: machineNotes,
                 syncStatus: 0,
-                uniqueKey: `${machineName}-${resource}-${entryDate}`
+                uniqueKey: generateUniqueKey('ressource', machineName, resource, entryDate)
             };
 
             if (existingEntry) {
@@ -682,7 +682,7 @@ async function saveCard(card, entryDate) {
                 compteurMoteurFin: compteurFin,
                 notes: machineNotes,
                 syncStatus: 0,
-                uniqueKey: `${machineName}-${entryDate}`
+                uniqueKey: generateUniqueKey('ressource', machineName, entryDate)
             };
             if (existingMachineOnly) {
                 await db.formEntries.update(existingMachineOnly.id, entryData);
@@ -800,9 +800,8 @@ async function saveCard(card, entryDate) {
             data.uniqueKey = existing.uniqueKey;
             await table.update(id, data);
         } else {
-            // Use a ternary operator to select the correct identifier
             const identifier = cardType === 'vente' ? data.client : data.idCamion;
-            data.uniqueKey = `${cardType}-${identifier}-${data.date}-${generateUUID()}`;
+            data.uniqueKey = generateUniqueKey(cardType, identifier, data.date);
             await table.add(data);
         }
     }

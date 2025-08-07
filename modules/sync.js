@@ -118,7 +118,7 @@ export async function refreshAllDataFromServer() {
 
         const deblai = spDeblai.map(item => ({
             uniqueKey: item.fields.Title,
-            date: item.fields.Date.split('T')[0],
+            date: item.fields.date.split('T')[0],
             idCamion: item.fields.IDCamion,
             voyages: parseInt(item.fields.Voyages, 10) || 0,
             commentaire: item.fields.Commentaire,

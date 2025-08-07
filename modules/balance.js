@@ -1,6 +1,6 @@
 import { db } from './database.js';
 import { saveClientPayment, getClientPayments } from './data.js';
-import { applySyncStatusClass } from './ui.js';
+import { applySyncStatusClass, updateUnsyncedCount } from './ui.js';
 
 async function updateClientBalanceCard(client, forDate) {
     const container = document.getElementById('ehd-balance-container');
@@ -63,6 +63,7 @@ async function promptForClientPayment(client, forDate) {
 
     // Refresh the card
     await updateClientBalanceCard(client, forDate);
+    updateUnsyncedCount();
 }
 
 export { updateClientBalanceCard };

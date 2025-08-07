@@ -14,3 +14,8 @@ export function generateUUID() {
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
 }
+
+export function generateUniqueKey(type, ...args) {
+  const date = new Date().toISOString().split('T')[0];
+  return `${type}-${date}-${args.join('-')}-${generateUUID()}`;
+}

@@ -1,6 +1,6 @@
 import { db } from './database.js';
 import { getRessourcesByDate } from './data.js';
-import { applySyncStatusClass } from './ui.js';
+import { applySyncStatusClass, updateUnsyncedCount } from './ui.js';
 
 let dailyStockCheckOverrides = {};
 
@@ -163,6 +163,7 @@ async function handleSaveStockCheck(resourceName, cardElement, quantityOnHand) {
 
     await updateCardStockDisplay(resourceName, forDate);
     alert(`Vérification du stock pour ${resourceName} le ${forDate} enregistrée : ${quantityOnHand}.`);
+    updateUnsyncedCount();
 }
 
 export function promptForMeasuredStock(resourceName, cardElement) {

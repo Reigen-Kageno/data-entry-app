@@ -49,8 +49,9 @@ This section details the role of each primary JavaScript file in the application
         *   **Responsibilities**:  
             *   Calculates client balances and formats values for display.  
             *   Handles creation/editing of **payment** entries **via the `data.js` layer (no direct IndexedDB calls)**.  
-            *   Updates the balance display card and emits UI events when balances change.*   **`masterData.js` (Master Data Manager)**
-    *   **Primary Role**: **Solely responsible for managing master data, specifically the machine list.**
+            *   Updates the balance display card and emits UI events when balances change.
+
+        *   **`masterData.js` (Master Data Manager)**    *   **Primary Role**: **Solely responsible for managing master data, specifically the machine list.**
     *   **Initialization (`initialize()`):**
         *   Loads existing machine data from IndexedDB cache.
         *   If online, performs a **single, robust fetch** of the latest machine list from SharePoint.
@@ -203,19 +204,7 @@ graph TD
 *   **`stockChecks`**: Stores daily stock measurements. Uses a compound primary key `[resourceName+date]` and includes `syncStatus` and `sharepointId`.
 *   **`machines`**: Stores master data about machines. Populated and managed by `masterData.js`. Includes `idMachine` (unique identifier), `displayName` (for UI), `active` status, `location`, and `machineType`.
 *   **`ventes`**: Stores sales records. Includes `syncStatus` and `sharepointId`.
-### 3.3 Data Synchronisation
 
-…  
--    *   **For `formEntries`, `ventes`, and `production` (Unique Key Strategy)**:  
-+    *   **For `formEntries`, `ventes`, `production`, and `clientPayments` (Unique Key Strategy)**:  
-…
-
-### 3.4 Data Refresh from Server
-
-…  
--4.  **Fetch All Data**: … for each data list (`formEntries`, `stockChecks`, `ventes`, `production`).  
-+4.  **Fetch All Data**: … for each data list (`formEntries`, `stockChecks`, `ventes`, `production`, `clientPayments`).  
-…
 ## 6. Error Handling & Robustness
 
 *   **Network Retries**: `masterData.js` implements retries for SharePoint API calls.

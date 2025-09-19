@@ -33,6 +33,17 @@ For a comprehensive technical architecture overview, see `ARCHITECTURE.md`.
 - Records sales entries with client, product, quantity, and payment amount.
 - Features a dynamic autocomplete for client names based on previous entries.
 
+#### Gasoil Livraison Date Navigation
+- **Smart Date Badges**: Clickable badges next to the date picker show gasoil livraison dates for easy navigation between cumul periods.
+- **Period Context**: Displays current period start (highlighted), previous livraison, and next livraison dates.
+- **Quick Navigation**: Click any badge to instantly jump to that date and view its data.
+- **Automatic Updates**: Badges refresh when dates change or new gasoil livraisons are recorded.
+
+#### Cumulative Totals (Running Totals)
+- **Production Cumul**: Shows cumulative tonnage since last gasoil livraison for Concassage and Extraction.
+- **Revenue Cumul**: Displays cumulative revenue since last gasoil livraison for Ventes.
+- **Period Reset Logic**: Cumul periods automatically reset based on gasoil livraison history.
+
 #### Data Refresh from Server
 - **Full Data Overwrite**: A new "Actualiser les données du serveur" button allows users to completely refresh the local data with the data from the SharePoint server.
 - **Use Cases**: This feature is intended for initial setup on a new device or for recovery in case of local data corruption.

@@ -216,3 +216,85 @@ export async function getClientPaymentsByDate(dateString) {
         return [];
     }
 }
+
+// Function to find the most recent gasoil livraison date before or on a specific date
+export async function getGasoilLivraisonDateForPeriod(currentDate) {
+    try {
+        const gasoilLivraisons = await db.formEntries
+            .where('resource').equals('Gasoil')
+            .and(entry => entry.machine.toLowerCase().startsWith('livraison') && entry.date <= currentDate)
+            .sortBy('date');
+
+        if (gasoilLivraisons.length > 0) {
+            return gasoilLivraisons[gasoilLivraisons.length - 1].date;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching gasoil livraison date for period:', error);
+        return null;
+    }
+}
+
+// Function to find the most recent gasoil livraison date (for backward compatibility)
+export async function getLatestGasoilLivraisonDate() {
+    try {
+        const gasoilLivraisons = await db.formEntries
+            .where('resource').equals('Gasoil')
+            .and(entry => entry.machine.toLowerCase().startsWith('livraison'))
+            .sortBy('date');
+
+        if (gasoilLivraisons.length > 0) {
+            return gasoilLivraisons[gasoilLivraisons.length - 1].date;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching latest gasoil livraison date:', error);
+        return null;
+    }
+}
+
+// Function to get production entries across a date range
+export async function getProductionByDateRange(startDate, endDate) {
+    try {
+        const entries = await db.production
+            .where('date')
+            .between(startDate, endDate, true, true)
+            .toArray();
+        console.log(`Production entries from ${startDate} to ${endDate}:`, entries);
+        return entries;
+    } catch (error) {
+        console.error(`Error fetching production entries from ${startDate} to ${endDate}:`, error);
+        return [];
+    }
+}
+
+// Function to get ventes entries across a date range
+export async function getVentesByDateRange(startDate, endDate) {
+    try {
+        const entries = await db.ventes
+            .where('date')
+            .between(startDate, endDate, true, true)
+            .toArray();
+        console.log(`Ventes entries from ${startDate} to ${endDate}:`, entries);
+        return entries;
+    } catch (error) {
+        console.error(`Error fetching ventes entries from ${startDate} to ${endDate}:`, error);
+        return [];
+    }
+}
+
+// Function to get earliest available data date (for fallback when no gasoil livraison exists)
+export async function getEarliestDataDate() {
+    try {
+        const [productionDates, ventesDates] = await Promise.all([
+            db.production.orderBy('date').first(),
+            db.ventes.orderBy('date').first()
+        ]);
+
+        const dates = [productionDates?.date, ventesDates?.date].filter(date => date);
+        return dates.length > 0 ? dates.sort()[0] : null;
+    } catch (error) {
+        console.error('Error fetching earliest data date:', error);
+        return null;
+    }
+}

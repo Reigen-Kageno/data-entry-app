@@ -2,6 +2,23 @@
 
 This document tracks significant changes and updates to the SOECO Basalt Site Data Entry Application.
 
+## [2.1.0] - 2025-09-19
+
+### Added
+- **Gasoil Livraison Date Navigation**: Added clickable date badges next to the date picker showing gasoil livraison dates for easy navigation between cumul periods.
+  - Displays 3 badges: current period start (highlighted), previous livraison, and next livraison
+  - Click any badge to instantly jump to that date
+  - French tooltips: "Début période cumul", "Livraison précédente", "Livraison suivante"
+  - Automatically updates when date changes or new gasoil livraisons are added
+  - Responsive design with mobile-friendly styling
+
+### Added
+- **Running Totals (Cumul) Display**: Enhanced Production and Ventes tabs with cumulative totals that reset based on gasoil livraison dates.
+  - Production totals show cumul tonnage since last gasoil livraison
+  - Ventes totals show cumul revenue since last gasoil livraison
+  - Clear visual distinction between daily and cumulative figures
+  - Automatic period detection based on gasoil livraison history
+
 ## [2.0.1] - 2025-08-05
 
 ### Fixed

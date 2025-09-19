@@ -69,6 +69,40 @@
       margin-left: 8px;
       display: none; /* Hidden by default */
     }
+    .gasoil-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border: 1px solid #ddd;
+      border-radius: 16px;
+      background-color: #f9f9f9;
+      cursor: pointer;
+      font-size: 0.85em;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .gasoil-badge:hover {
+      background-color: #e8f5e8;
+      border-color: #4caf50;
+    }
+    .gasoil-badge.current-period {
+      background-color: #e8f5e8;
+      border-color: #4caf50;
+      font-weight: bold;
+    }
+    .gasoil-badge .date-icon {
+      font-size: 0.9em;
+    }
+    .gasoil-badge .date-text {
+      font-weight: 500;
+    }
+    @media (max-width: 768px) {
+      .gasoil-badge {
+        padding: 3px 6px;
+        font-size: 0.8em;
+      }
+    }
   </style>  
   
   <!-- Load MSAL first -->
@@ -120,7 +154,10 @@
 </head>
 <body>
   <h2>Saisie Quotidienne</h2>
-  <label>Date: <input type="date" id="entry-date" name="entry-date" required></label>
+  <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+    <label>Date: <input type="date" id="entry-date" name="entry-date" required></label>
+    <div id="gasoil-dates-indicator" style="display: flex; gap: 5px; flex-wrap: wrap;"></div>
+  </div>
 
   <div class="tab-nav">
     <button class="tab-btn active" data-tab="ressources">Ressources</button>

@@ -2,7 +2,7 @@ import { db } from './database.js';
 import { RESOURCES } from './constants.js';
 import { generateUUID, generateUniqueKey } from './utils.js';
 import { updateCardStockDisplay, promptForMeasuredStock, clearDailyStockCheckOverrides, getDailyStockCheckOverrides } from './stock.js';
-import { getAllEntriesByDate, deleteEntryAndQueue } from './data.js';
+import { getAllEntriesByDate, deleteEntryAndQueue, getGasoilLivraisonDateForPeriod, getProductionByDateRange, getVentesByDateRange, getEarliestDataDate } from './data.js';
 import { updateClientBalanceCard } from './balance.js';
 import config from '../config.global.js';
 
@@ -534,13 +534,15 @@ export function initializeAppUI(masterData) {
         } else if (changesMade) {
             updateSyncStatusUI(navigator.onLine, 'Modifications enregistrées localement.');
             await loadEntriesForDate(entryDateValue);
+            await updateGasoilDateBadges(entryDateValue);
             updateUnsyncedCount();
         }
     });
 
-    dateInput.addEventListener('change', (e) => {
+    dateInput.addEventListener('change', async (e) => {
         clearDailyStockCheckOverrides();
         clearTrackingSets();
+        await updateGasoilDateBadges(e.target.value);
         loadEntriesForDate(e.target.value);
     });
 
@@ -586,6 +588,7 @@ export function initializeAppUI(masterData) {
     }
 
     loadEntriesForDate(dateInput.value);
+    updateGasoilDateBadges(dateInput.value);
     updateSyncButtonState();
     updateUnsyncedCount();
 }
@@ -921,20 +924,21 @@ export async function loadEntriesForDate(dateString) {
     });
 
     // Update the new totals cards
-    updateProductionTotals(production);
-    updateVentesTotals(ventes);
+    updateProductionTotals(production, dateString);
+    updateVentesTotals(ventes, dateString);
     updateDeblaiTotals(deblai);
     updateClientBalanceCard('EHD', dateString, ventes);
 }
 
-function updateProductionTotals(entries) {
+async function updateProductionTotals(dailyEntries, currentDate) {
     const container = document.getElementById('production-totals-container');
     if (!container) return;
 
-    const concassageEntries = entries.filter(e => e.destination === 'Concassage');
-    const extractionEntries = entries.filter(e => e.origine === 'Extraction');
-    const stockageEntries = entries.filter(e => e.destination === 'Stockage');
-    const stockOutEntries = entries.filter(e => e.origine === 'Stockage' && e.destination === 'Concassage');
+    // Calculate daily totals
+    const concassageEntries = dailyEntries.filter(e => e.destination === 'Concassage');
+    const extractionEntries = dailyEntries.filter(e => e.origine === 'Extraction');
+    const stockageEntries = dailyEntries.filter(e => e.destination === 'Stockage');
+    const stockOutEntries = dailyEntries.filter(e => e.origine === 'Stockage' && e.destination === 'Concassage');
 
     const totalWeightConcassage = concassageEntries.reduce((sum, e) => sum + (e.poids * (e.voyages || 1)), 0);
     const totalTripsConcassage = concassageEntries.reduce((sum, e) => sum + (e.voyages || 1), 0);
@@ -948,10 +952,26 @@ function updateProductionTotals(entries) {
     const totalWeightStockOut = stockOutEntries.reduce((sum, e) => sum + (e.poids * (e.voyages || 1)), 0);
     const stockRestant = totalWeightStockage - totalWeightStockOut;
 
+    // Calculate cumul (running totals)
+    let cumulConcassage = 0;
+    let cumulExtraction = 0;
+
+    const startDate = await getGasoilLivraisonDateForPeriod(currentDate) || await getEarliestDataDate();
+
+    if (startDate) {
+        const cumulEntries = await getProductionByDateRange(startDate, currentDate);
+        const cumulConcassageEntries = cumulEntries.filter(e => e.destination === 'Concassage');
+        const cumulExtractionEntries = cumulEntries.filter(e => e.origine === 'Extraction');
+
+        cumulConcassage = cumulConcassageEntries.reduce((sum, e) => sum + (e.poids * (e.voyages || 1)), 0);
+        cumulExtraction = cumulExtractionEntries.reduce((sum, e) => sum + (e.poids * (e.voyages || 1)), 0);
+    }
+
     container.innerHTML = `
         <div class="stock-card">
             <span class="resource-name">Total Concassage</span>
             <div class="stock-value">${totalWeightConcassage.toFixed(2)} t</div>
+            <div class="stock-value" style="font-weight: bold;">Cumul: ${cumulConcassage.toFixed(2)} t</div>
         </div>
         <div class="stock-card">
             <span class="resource-name">Poids Moyen Concassage</span>
@@ -960,6 +980,7 @@ function updateProductionTotals(entries) {
         <div class="stock-card">
             <span class="resource-name">Total Extraction</span>
             <div class="stock-value">${totalWeightExtraction.toFixed(2)} t</div>
+            <div class="stock-value" style="font-weight: bold;">Cumul: ${cumulExtraction.toFixed(2)} t</div>
         </div>
         <div class="stock-card">
             <span class="resource-name">Poids Moyen Extraction</span>
@@ -990,13 +1011,14 @@ function updateDeblaiTotals(entries) {
     `;
 }
 
-function updateVentesTotals(entries) {
+async function updateVentesTotals(dailyEntries, currentDate) {
     const container = document.getElementById('ventes-totals-container');
     if (!container) return;
 
-    const totalRevenue = entries.reduce((sum, entry) => sum + (entry.montantPaye || 0), 0);
-    const salesCount = entries.length;
-    const productTotals = entries.reduce((acc, entry) => {
+    // Calculate daily totals
+    const totalRevenue = dailyEntries.reduce((sum, entry) => sum + (entry.montantPaye || 0), 0);
+    const salesCount = dailyEntries.length;
+    const productTotals = dailyEntries.reduce((acc, entry) => {
         const quantity = parseFloat(entry.quantite) || 0;
         if (!acc[entry.produit]) {
             acc[entry.produit] = 0;
@@ -1011,10 +1033,21 @@ function updateVentesTotals(entries) {
         productTotalsHtml += `<div><strong>${product}:</strong> ${totalInTons.toFixed(2)} tonnes</div>`;
     }
 
+    // Calculate cumul (running totals)
+    let cumulRevenue = 0;
+
+    const startDate = await getGasoilLivraisonDateForPeriod(currentDate) || await getEarliestDataDate();
+
+    if (startDate) {
+        const cumulEntries = await getVentesByDateRange(startDate, currentDate);
+        cumulRevenue = cumulEntries.reduce((sum, entry) => sum + (entry.montantPaye || 0), 0);
+    }
+
     container.innerHTML = `
         <div class="stock-card">
             <span class="resource-name">Revenu Total</span>
             <div class="stock-value">${totalRevenue.toLocaleString('fr-FR')} CFA</div>
+            <div class="stock-value" style="font-weight: bold;">Cumul: ${cumulRevenue.toLocaleString('fr-FR')} CFA</div>
         </div>
         <div class="stock-card">
             <span class="resource-name">Nb. Ventes</span>
@@ -1044,4 +1077,110 @@ async function updateUnsyncedCount() {
 
     badge.textContent = totalUnsynced;
     badge.style.display = totalUnsynced > 0 ? 'inline-block' : 'none';
+}
+
+// Function to get the 3 relevant gasoil livraison dates for navigation
+async function getGasoilLivraisonNavigationDates(currentDate) {
+    try {
+        // Get all gasoil livraison dates
+        const allGasoilDates = await db.formEntries
+            .where('resource').equals('Gasoil')
+            .and(entry => entry.machine.toLowerCase().startsWith('livraison'))
+            .sortBy('date');
+
+        if (allGasoilDates.length === 0) {
+            return { current: null, previous: null, next: null };
+        }
+
+        const dates = allGasoilDates.map(entry => entry.date);
+
+        // Find current period start (most recent date <= currentDate)
+        const currentPeriodDate = dates
+            .filter(date => date <= currentDate)
+            .sort()
+            .pop(); // Last (most recent) date <= currentDate
+
+        // Find previous (date before current period start)
+        const currentIndex = dates.indexOf(currentPeriodDate);
+        const previousDate = currentIndex > 0 ? dates[currentIndex - 1] : null;
+
+        // Find next (first date after currentDate)
+        const nextDate = dates.find(date => date > currentDate) || null;
+
+        return {
+            current: currentPeriodDate,
+            previous: previousDate,
+            next: nextDate
+        };
+    } catch (error) {
+        console.error('Error fetching gasoil livraison navigation dates:', error);
+        return { current: null, previous: null, next: null };
+    }
+}
+
+// Function to format date for display (month/day only)
+function formatGasoilDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun',
+                       'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+    return `${monthNames[date.getMonth()]} ${date.getDate()}`;
+}
+
+// Function to update gasoil livraison date badges
+async function updateGasoilDateBadges(currentDate) {
+    const indicator = document.getElementById('gasoil-dates-indicator');
+    if (!indicator) return;
+
+    const { current, previous, next } = await getGasoilLivraisonNavigationDates(currentDate);
+
+    // Clear existing badges
+    indicator.innerHTML = '';
+
+    // Helper to create a badge
+    const createBadge = (date, type, tooltip) => {
+        if (!date) return;
+
+        const badge = document.createElement('div');
+        badge.className = `gasoil-badge ${type === 'current' ? 'current-period' : ''}`;
+        badge.title = tooltip;
+
+        const icon = document.createElement('span');
+        icon.className = 'date-icon';
+        icon.textContent = '📅';
+        badge.appendChild(icon);
+
+        const text = document.createElement('span');
+        text.className = 'date-text';
+        text.textContent = formatGasoilDate(date);
+        badge.appendChild(text);
+
+        // Click handler to navigate to date
+        badge.addEventListener('click', () => {
+            const dateInput = document.getElementById('entry-date');
+            if (dateInput) {
+                dateInput.value = date;
+                // Trigger change event to reload data
+                dateInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        return badge;
+    };
+
+    // Add badges in order: previous, current, next
+    if (previous) {
+        const prevBadge = createBadge(previous, 'previous', 'Livraison précédente');
+        if (prevBadge) indicator.appendChild(prevBadge);
+    }
+
+    if (current) {
+        const currentBadge = createBadge(current, 'current', 'Début période cumul');
+        if (currentBadge) indicator.appendChild(currentBadge);
+    }
+
+    if (next) {
+        const nextBadge = createBadge(next, 'next', 'Livraison suivante');
+        if (nextBadge) indicator.appendChild(nextBadge);
+    }
 }

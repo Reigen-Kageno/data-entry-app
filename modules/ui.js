@@ -2,7 +2,7 @@ import { db } from './database.js';
 import { RESOURCES } from './constants.js';
 import { generateUUID, generateUniqueKey } from './utils.js';
 import { updateCardStockDisplay, promptForMeasuredStock, clearDailyStockCheckOverrides, getDailyStockCheckOverrides } from './stock.js';
-import { getAllEntriesByDate, deleteEntryAndQueue, getGasoilLivraisonDateForPeriod, getProductionByDateRange, getVentesByDateRange, getEarliestDataDate } from './data.js';
+import { getAllEntriesByDate, deleteEntryAndQueue, getGasoilLivraisonDateForPeriod, getProductionByDateRange, getVentesByDateRange, getEarliestDataDate, getFormEntriesByDateRange } from './data.js';
 import { updateClientBalanceCard } from './balance.js';
 import config from '../config.global.js';
 
@@ -626,6 +626,19 @@ async function saveCard(card, entryDate) {
         const compteurDebut = parseFloat(card.querySelector('input[name="compteurMoteurDebut"]').value || '0');
         const compteurFin = parseFloat(card.querySelector('input[name="compteurMoteurFin"]').value || '0');
 
+        // VALIDATION: Compteur fin must be >= compteur debut
+        const compteurDebutInput = card.querySelector('input[name="compteurMoteurDebut"]');
+        const compteurFinInput = card.querySelector('input[name="compteurMoteurFin"]');
+
+        if (!isNaN(compteurDebut) && !isNaN(compteurFin) && compteurFin < compteurDebut) {
+            compteurFinInput.classList.add('invalid');
+            compteurDebutInput.classList.add('invalid');
+            isValid = false;
+        } else {
+            compteurFinInput.classList.remove('invalid');
+            compteurDebutInput.classList.remove('invalid');
+        }
+
         // --- Diffing Logic ---
         const oldState = id ? await db.formEntries.where({ machine: (await db.formEntries.get(id)).machine, date: entryDate }).toArray() : [];
         const newStateRows = Array.from(card.querySelectorAll('.resource-row'));
@@ -1027,6 +1040,9 @@ async function updateVentesTotals(dailyEntries, currentDate) {
         return acc;
     }, {});
 
+    // Calculate grand total in tonnes (sum of all products)
+    const totalTonnes = Object.values(productTotals).reduce((sum, quantity) => sum + (quantity * 1.5), 0);
+
     let productTotalsHtml = '';
     for (const [product, total] of Object.entries(productTotals)) {
         const totalInTons = total * 1.5;
@@ -1035,12 +1051,24 @@ async function updateVentesTotals(dailyEntries, currentDate) {
 
     // Calculate cumul (running totals)
     let cumulRevenue = 0;
+    let cumulTonnes = 0;
 
     const startDate = await getGasoilLivraisonDateForPeriod(currentDate) || await getEarliestDataDate();
 
     if (startDate) {
         const cumulEntries = await getVentesByDateRange(startDate, currentDate);
         cumulRevenue = cumulEntries.reduce((sum, entry) => sum + (entry.montantPaye || 0), 0);
+
+        // Calculate cumulative tonnes
+        const cumulProductTotals = cumulEntries.reduce((acc, entry) => {
+            const quantity = parseFloat(entry.quantite) || 0;
+            if (!acc[entry.produit]) {
+                acc[entry.produit] = 0;
+            }
+            acc[entry.produit] += quantity;
+            return acc;
+        }, {});
+        cumulTonnes = Object.values(cumulProductTotals).reduce((sum, quantity) => sum + (quantity * 1.5), 0);
     }
 
     container.innerHTML = `
@@ -1048,6 +1076,11 @@ async function updateVentesTotals(dailyEntries, currentDate) {
             <span class="resource-name">Revenu Total</span>
             <div class="stock-value">${totalRevenue.toLocaleString('fr-FR')} CFA</div>
             <div class="stock-value" style="font-weight: bold;">Cumul: ${cumulRevenue.toLocaleString('fr-FR')} CFA</div>
+        </div>
+        <div class="stock-card">
+            <span class="resource-name">Total Tonnes</span>
+            <div class="stock-value">${totalTonnes.toFixed(2)} t</div>
+            <div class="stock-value" style="font-weight: bold;">Cumul: ${cumulTonnes.toFixed(2)} t</div>
         </div>
         <div class="stock-card">
             <span class="resource-name">Nb. Ventes</span>
@@ -1167,6 +1200,80 @@ async function updateGasoilDateBadges(currentDate) {
 
         return badge;
     };
+
+    // Helper to create GE35 hours badge (non-clickable)
+    const createGE35Badge = async (startDate) => {
+        if (!startDate) return null;
+
+        const formEntries = await getFormEntriesByDateRange(startDate, currentDate);
+        const ge35Entries = formEntries
+            .filter(e => e.machine === 'GE35')
+            .sort((a,b) => new Date(a.date) - new Date(b.date)); // Sort by date
+
+        if (ge35Entries.length === 0) return null;
+
+        // SAFE numeric calculation - only use valid positive values
+        let maxFinal = -Infinity;
+        let minStarting = Infinity;
+        let hasIncompleteData = false;
+
+        ge35Entries.forEach(entry => {
+            const debut = parseFloat(entry.compteurMoteurDebut);
+            const fin = parseFloat(entry.compteurMoteurFin);
+
+            // Only use valid, positive numbers (no || 0 fallbacks!)
+            if (!isNaN(fin) && fin > 0) {
+                maxFinal = Math.max(maxFinal, fin);
+            } else if (!isNaN(debut) && debut > 0) {
+                // Has valid debut but no/invalid fin
+                hasIncompleteData = true;
+            }
+
+            if (!isNaN(debut) && debut > 0) {
+                minStarting = Math.min(minStarting, debut);
+            } else if (!isNaN(fin) && fin > 0) {
+                // Has valid fin but no/invalid debut
+                hasIncompleteData = true;
+            }
+        });
+
+        const ge35Hours = maxFinal > minStarting ? maxFinal - minStarting : 0;
+
+        if (ge35Hours === 0) return null; // Don't show if no hours
+
+        const badge = document.createElement('div');
+        badge.className = 'gasoil-badge ge35-hours';
+        badge.style.cursor = 'default'; // Non-clickable
+
+        // Set styling based on data completeness
+        if (hasIncompleteData) {
+            badge.title = 'Heures approximatives GE35 - données incomplètes depuis dernière livraison';
+            badge.style.backgroundColor = '#fff3cd'; // Light yellow
+            badge.style.borderColor = '#f0ad4e'; // Orange border
+        } else {
+            badge.title = 'Heures cumulées GE35 depuis dernière livraison';
+            badge.style.backgroundColor = '#e8f5e8'; // Light green
+            badge.style.borderColor = '#4caf50'; // Green border
+        }
+
+        const icon = document.createElement('span');
+        icon.className = 'date-icon';
+        icon.textContent = hasIncompleteData ? '⚠️' : '⚙️';
+        badge.appendChild(icon);
+
+        const text = document.createElement('span');
+        text.className = 'date-text';
+        text.textContent = hasIncompleteData
+            ? `${ge35Hours.toFixed(1)} heures (approx)`
+            : `${ge35Hours.toFixed(1)} heures cumul`;
+        badge.appendChild(text);
+
+        return badge;
+    };
+
+    // Add GE35 hours badge first (rightmost)
+    const ge35Badge = await createGE35Badge(current);
+    if (ge35Badge) indicator.appendChild(ge35Badge);
 
     // Add badges in order: previous, current, next
     if (previous) {

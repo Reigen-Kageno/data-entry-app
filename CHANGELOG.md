@@ -2,6 +2,12 @@
 
 This document tracks significant changes and updates to the SOECO Basalt Site Data Entry Application.
 
+## [Unreleased]
+
+### **Fixed**
+- **GE35 Hours Calculation Bug**: Fixed critical calculation error where blank compteur fields were treated as 0, corrupting accumulated hours totals and showing incorrect values
+- **Data Integrity**: Added form validation to prevent compteur fin < compteur debut, preventing illogical fuel consumption entries
+
 ## [2.1.0] - 2025-09-19
 
 ### Added
@@ -18,6 +24,26 @@ This document tracks significant changes and updates to the SOECO Basalt Site Da
   - Ventes totals show cumul revenue since last gasoil livraison
   - Clear visual distinction between daily and cumulative figures
   - Automatic period detection based on gasoil livraison history
+
+### Added
+- **Ventes Grand Total Card**: New "Total Tonnes" card in ventes totals showing the sum of all product quantities in tonnes (converted from m³ × 1.5)
+  - Includes running total ("Cumul") that resets at gasoil livraison dates
+  - Positioned between revenue and sales count for logical flow
+  - Follows existing stock-card styling and calculation patterns
+
+### Added
+- **GE35 Machine Hours Badge**: Non-clickable info badge showing cumulative hours for GE35 machine since last gasoil livraison
+  - Displays as "⚙️ X.X heures cumul" with green styling
+  - Positioned rightmost in the gasoil dates indicator area
+  - Robust calculation with safe numeric parsing (handles missing/null compteur values)
+  - Only shows when GE35 has accumulated hours > 0
+  - Tooltip: "Heures cumulées GE35 depuis dernière livraison"
+
+### Technical
+- **New Data Function**: Added `getFormEntriesByDateRange()` for querying formEntries across date ranges
+  - Mirrors existing `getProductionByDateRange()` and `getVentesByDateRange()` patterns
+  - Optimized for machine field queries (already indexed in database schema)
+  - Used for GE35 hours calculation and future extensibility
 
 ## [2.0.1] - 2025-08-05
 

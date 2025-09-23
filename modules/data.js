@@ -298,3 +298,18 @@ export async function getEarliestDataDate() {
         return null;
     }
 }
+
+// Function to get formEntries across a date range
+export async function getFormEntriesByDateRange(startDate, endDate) {
+    try {
+        const entries = await db.formEntries
+            .where('date')
+            .between(startDate, endDate, true, true)
+            .toArray();
+        console.log(`Form entries from ${startDate} to ${endDate}:`, entries);
+        return entries;
+    } catch (error) {
+        console.error(`Error fetching form entries from ${startDate} to ${endDate}:`, error);
+        return [];
+    }
+}

@@ -157,6 +157,13 @@
   <h2>Saisie Quotidienne</h2>
   <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
     <label>Date: <input type="date" id="entry-date" name="entry-date" required></label>
+    <select id="cumul-period-selector" style="padding: 4px;">
+      <option value="auto">📅 Cumul: Depuis dernière livraison</option>
+      <option value="mining">⛏️ Depuis début minage</option>
+      <option value="select">📆 Sélectionner date</option>
+    </select>
+    <div id="cumul-period-indicator" style="font-weight: bold; color: #666;"></div>
+    <input type="date" id="custom-cumul-date-picker" style="display: none; padding: 4px; margin-left: 5px;">
     <div id="gasoil-dates-indicator" style="display: flex; gap: 5px; flex-wrap: wrap;"></div>
   </div>
 
@@ -171,10 +178,7 @@
   <datalist id="truck-list"></datalist>
   <datalist id="client-list"></datalist>
 
-  <div id="global-controls" style="margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; background-color: #f7f7f7;">
-    <button type="button" class="btn" id="edit-day-btn">Modifier la Journée</button>
-    <button type="button" class="btn" id="delete-selected-btn" style="display: none; background-color: #e53935;">Supprimer la Sélection</button>
-  </div>
+  <!-- Bulk editing controls removed - using individual card edit buttons now -->
 
   <div id="ressources" class="tab-content active">
     <div class="stock-info-section">
@@ -219,7 +223,7 @@
   <p id="syncStatus">Statut de chargement...</p>
   <template id="ressource-card-template">
     <div class="ressource-card machine-section status-new">
-      <input type="checkbox" class="entry-checkbox" style="position: absolute; top: 10px; right: 10px;">
+      <button type="button" class="btn small edit-btn" style="position: absolute; top: 10px; right: 10px; display: none;">✏️ Modifier</button>
       <div style="display: flex; gap: 10px; margin-bottom: 10px;">
         <label style="flex: 1;">
           ID Machine:
@@ -268,7 +272,7 @@
 
   <template id="production-card-template">
     <div class="production-card status-new">
-      <input type="checkbox" class="entry-checkbox" style="position: absolute; top: 10px; right: 10px;">
+      <button type="button" class="btn small edit-btn" style="position: absolute; top: 10px; right: 10px; display: none;">✏️ Modifier</button>
       <label>ID Camion: <input type="text" name="idCamion" list="truck-list" required autocomplete="off" style="width: 100%;"></label>
       <label>Poids (tonnes): <input type="number" name="poids" step="0.01" required style="width: 100%;"></label>
       <label>Nombre de voyages: <input type="number" name="voyages" value="1" step="1" required style="width: 100%;"></label>
@@ -290,7 +294,7 @@
 
   <template id="deblai-card-template">
     <div class="deblai-card status-new">
-      <input type="checkbox" class="entry-checkbox" style="position: absolute; top: 10px; right: 10px;">
+      <button type="button" class="btn small edit-btn" style="position: absolute; top: 10px; right: 10px; display: none;">✏️ Modifier</button>
       <label>ID Camion: <input type="text" name="idCamion" list="truck-list" required autocomplete="off" style="width: 100%;"></label>
       <label>Nombre de voyages: <input type="number" name="voyages" value="1" step="1" required style="width: 100%;"></label>
       <label>Commentaire: <textarea name="commentaire" rows="2" style="width: 100%;"></textarea></label>
@@ -299,7 +303,7 @@
 
   <template id="ventes-card-template">
     <div class="ventes-card status-new">
-      <input type="checkbox" class="entry-checkbox" style="position: absolute; top: 10px; right: 10px;">
+      <button type="button" class="btn small edit-btn" style="position: absolute; top: 10px; right: 10px; display: none;">✏️ Modifier</button>
       <label>Client: <input type="text" name="client" list="client-list" required autocomplete="off" style="width: 100%;"></label>
       <label>Produit: 
         <select name="produit" style="width: 100%;">

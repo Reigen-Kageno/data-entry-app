@@ -16,6 +16,11 @@ export function generateUUID() {
 }
 
 export function generateUniqueKey(type, ...args) {
-  const date = new Date().toISOString().split('T')[0];
-  return `${type}-${date}-${args.join('-')}-${generateUUID()}`;
+  const dateStr = new Date().toISOString().split('T')[0];
+
+  // Commercial entries: allow multiples, add UUID
+  const multiTypes = ['vente', 'production', 'deblai', 'clientPayment'];
+  const uuidSuffix = multiTypes.includes(type) ? `-${generateUUID()}` : '';
+
+  return `${type}-${dateStr}-${args.join('-')}${uuidSuffix}`;
 }

@@ -2,7 +2,7 @@ import { db } from './database.js';
 import { RESOURCES } from './constants.js';
 import { generateUUID, generateUniqueKey } from './utils.js';
 import { updateCardStockDisplay, promptForMeasuredStock, clearDailyStockCheckOverrides, getDailyStockCheckOverrides } from './stock.js';
-import { getAllEntriesByDate, deleteEntryAndQueue, getGasoilLivraisonDateForPeriod, getProductionByDateRange, getVentesByDateRange, getEarliestDataDate, getFormEntriesByDateRange } from './data.js';
+import { getAllEntriesByDate, deleteEntryAndQueue, getGasoilLivraisonDateForPeriod, getProductionByDateRange, getVentesByDateRange, getEarliestDataDate, getFormEntriesByDateRange, getMiningProcessStartDate } from './data.js';
 import { updateClientBalanceCard } from './balance.js';
 import config from '../config.global.js';
 
@@ -20,7 +20,119 @@ let machineOptions = []; // This array holds the machine options for datalists
 const selectedMachines = new Set(); // Tracks selected machines for the current date
 const machineResourceSets = new Map(); // Map of machine elements to their selected resources
 let masterDataInstance; // To hold the masterData manager instance
-let isEditMode = false; // Global flag for edit mode
+// Removed isEditMode - using individual card editing now
+
+// --- Global cumul state management ---
+let cumulPeriodMode = 'auto'; // 'auto', 'select', 'mining'
+let cumulStartDate = null; // Selected start date for cumulative calculations
+
+// --- Validation and cumul state functions ---
+
+function validateCumulDates(startDate, endDate) {
+    if (!startDate || !endDate) {
+        return { valid: false, error: "Les dates ne peuvent pas être vides" };
+    }
+
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+
+    if (start > end) {
+        return { valid: false, error: "La date de début cumul ne peut pas être après la date sélectionnée" };
+    }
+
+    return { valid: true };
+}
+
+// Function to get the effective cumul start date based on current mode
+async function getEffectiveCumulStartDate() {
+    const currentDate = dateInput.value;
+
+    switch (cumulPeriodMode) {
+        case 'auto':
+            // Default: last gasoil livraison or earliest data
+            return await getGasoilLivraisonDateForPeriod(currentDate) || await getEarliestDataDate();
+
+        case 'mining':
+            // Mining start date
+            return await getMiningProcessStartDate(currentDate) ||
+                   await getGasoilLivraisonDateForPeriod(currentDate) ||
+                   await getEarliestDataDate();
+
+        case 'select':
+            // User-selected date (if valid)
+            if (cumulStartDate) {
+                const validation = validateCumulDates(cumulStartDate, currentDate);
+                if (validation.valid) {
+                    return cumulStartDate;
+                }
+            }
+            // Fallback to auto mode if invalid
+            setCumulPeriodMode('auto');
+            return await getEffectiveCumulStartDate();
+
+        default:
+            return await getGasoilLivraisonDateForPeriod(currentDate) || await getEarliestDataDate();
+    }
+}
+
+// Function to set cumul period mode and handle validation
+function setCumulPeriodMode(mode) {
+    cumulPeriodMode = mode;
+    console.log(`Cumul period mode changed to: ${mode}`);
+
+    // Update UI to reflect current mode
+    updateCumulModeUI();
+
+    // Refresh all totals if dates are valid
+    if (dateInput && dateInput.value) {
+        loadEntriesForDate(dateInput.value);
+        updateGasoilDateBadges(dateInput.value);
+    }
+}
+
+// Function to set custom cumul start date
+function setCumulStartDate(dateString) {
+    const currentDate = dateInput.value;
+    const validation = validateCumulDates(dateString, currentDate);
+
+    if (validation.valid) {
+        cumulStartDate = dateString;
+        cumulPeriodMode = 'select';
+        updateCumulModeUI();
+        loadEntriesForDate(currentDate);
+        updateGasoilDateBadges(currentDate);
+    } else {
+        alert(validation.error);
+    }
+}
+
+// Function to update the cumul mode UI indicator
+function updateCumulModeUI() {
+    const indicator = document.getElementById('cumul-period-indicator');
+    if (!indicator) return;
+
+    let displayText = '';
+    switch (cumulPeriodMode) {
+        case 'auto':
+            displayText = 'Auto (livraison)';
+            break;
+        case 'mining':
+            displayText = 'Début minage';
+            break;
+        case 'select':
+            if (cumulStartDate) {
+                const date = new Date(cumulStartDate);
+                displayText = `Depuis ${date.toLocaleDateString('fr-FR', { month: 'short', day: 'numeric' })}`;
+            } else {
+                displayText = 'Sélectionner';
+            }
+            break;
+        default:
+            displayText = 'Auto';
+    }
+
+    indicator.textContent = `Cumul: ${displayText}`;
+}
 
 // --- Helper Function Definitions ---
 
@@ -278,9 +390,21 @@ function setCardReadOnly(card, isReadOnly, syncStatus) {
         el.disabled = isReadOnly;
     });
 
+    // Display name field should ALWAYS be readonly, regardless of card edit mode
+    const displayNameField = card.querySelector('input[name="machine-display-name"]');
+    if (displayNameField) {
+        displayNameField.readOnly = true;
+    }
+
     card.querySelectorAll('.add-resource, .remove-resource').forEach(btn => {
         btn.style.display = isReadOnly ? 'none' : 'block';
     });
+
+    // Show/hide edit button based on sync status - only show for unsynced entries
+    const editBtn = card.querySelector('.edit-btn');
+    if (editBtn) {
+        editBtn.style.display = (syncStatus === 1) ? 'none' : 'inline-block';
+    }
 
     const checkbox = card.querySelector('.entry-checkbox');
     if (checkbox) {
@@ -354,6 +478,13 @@ async function loadRessourcesEntries(dateString, entries) {
             resourceRow.querySelector('select[name="resource"]').value = resourceEntry.resource;
             resourceRow.querySelector('input[name="quantity"]').value = resourceEntry.quantity;
         });
+
+        // Populate display name for existing cards
+        const machineInput = card.querySelector('input[name="machine"]');
+        if (machineInput && machineInput.value) {
+            updateMachineDisplayName(machineInput);
+        }
+
         setCardReadOnly(card, true, resources[0].syncStatus);
     }
 }
@@ -372,9 +503,6 @@ export function initializeAppUI(masterData) {
     console.log("DB is ready. Initializing UI.");
 
     // --- Global Elements ---
-    const editDayBtn = document.getElementById('edit-day-btn');
-    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
-    
     dateInput = document.getElementById('entry-date');
     machineList = document.getElementById('machine-list');
     resourceStockCardsContainer = document.getElementById('resource-stock-cards-container');
@@ -546,22 +674,44 @@ export function initializeAppUI(masterData) {
         loadEntriesForDate(e.target.value);
     });
 
-    editDayBtn.addEventListener('click', () => {
-        isEditMode = !isEditMode;
-        toggleEditMode(isEditMode);
-    });
+    // Handle cumul period selector changes
+    const cumulPeriodSelector = document.getElementById('cumul-period-selector');
+    const customDatePicker = document.getElementById('custom-cumul-date-picker');
 
-    deleteSelectedBtn.addEventListener('click', () => {
-        handleDeleteSelection();
-    });
+    if (cumulPeriodSelector) {
+        cumulPeriodSelector.addEventListener('change', async (e) => {
+            const selectedValue = e.target.value;
 
-    // Add a single listener for all checkboxes to update the delete button state
-    document.body.addEventListener('click', (e) => {
-        if (e.target.matches('.entry-checkbox')) {
-            const anyChecked = document.querySelector('.entry-checkbox:checked');
-            deleteSelectedBtn.style.display = anyChecked ? 'inline-block' : 'none';
-        }
-    });
+            if (selectedValue === 'auto') {
+                customDatePicker.style.display = 'none';
+                setCumulPeriodMode('auto');
+            } else if (selectedValue === 'mining') {
+                customDatePicker.style.display = 'none';
+                setCumulPeriodMode('mining');
+            } else if (selectedValue === 'select') {
+                // Show the custom date picker
+                customDatePicker.style.display = 'inline';
+                // Set max date to prevent future dates
+                customDatePicker.max = dateInput.value;
+                // Pre-select current cumul date if any
+                if (cumulStartDate) {
+                    customDatePicker.value = cumulStartDate;
+                }
+            }
+        });
+    }
+
+    // Handle custom date picker changes
+    if (customDatePicker) {
+        customDatePicker.addEventListener('change', (e) => {
+            const selectedDate = e.target.value;
+            if (selectedDate) {
+                setCumulStartDate(selectedDate);
+            }
+        });
+    }
+
+
 
     document.querySelector('.tab-nav').addEventListener('click', (e) => {
       if (e.target.matches('.tab-btn')) {
@@ -591,6 +741,259 @@ export function initializeAppUI(masterData) {
     updateGasoilDateBadges(dateInput.value);
     updateSyncButtonState();
     updateUnsyncedCount();
+    updateCumulModeUI();
+
+    // Initialize individual card edit/delete functionality
+    initializeCardEditing();
+
+    // Initialize machine input validation and display name population
+    initializeMachineSelection();
+}
+
+function initializeMachineSelection() {
+    // Delegate event listener for machine input changes to populate display name
+    document.addEventListener('input', (e) => {
+        if (e.target.name === 'machine' && e.target.tagName === 'INPUT') {
+            updateMachineDisplayName(e.target);
+        }
+    });
+
+    // Also handle change event for when user selects from datalist
+    document.addEventListener('change', (e) => {
+        if (e.target.name === 'machine' && e.target.tagName === 'INPUT') {
+            updateMachineDisplayName(e.target);
+            validateMachineInput(e.target);
+        }
+    });
+}
+
+function updateMachineDisplayName(machineInput) {
+    const machineId = machineInput.value.trim();
+    const card = machineInput.closest('.ressource-card');
+
+    if (!card) return;
+
+    const displayNameField = card.querySelector('input[name="machine-display-name"]');
+    if (!displayNameField) return;
+
+    if (machineId) {
+        const machine = masterDataInstance.findMachineByIdMachine(machineId);
+        if (machine && machine.displayName) {
+            displayNameField.value = machine.displayName;
+        } else {
+            displayNameField.value = '';
+        }
+    } else {
+        displayNameField.value = '';
+    }
+}
+
+function validateMachineInput(machineInput) {
+    const machineId = machineInput.value.trim();
+
+    // Clear any previous validation messages
+    machineInput.setCustomValidity('');
+
+    if (!machineId) {
+        machineInput.setCustomValidity('ID Machine requis');
+        return;
+    }
+
+    // Check if the entered machine ID exists in our machine list
+    const machine = masterDataInstance.findMachineByIdMachine(machineId);
+    if (!machine) {
+        machineInput.setCustomValidity('Veuillez sélectionner une machine valide dans la liste');
+        machineInput.value = ''; // Clear invalid input
+        updateMachineDisplayName(machineInput); // Clear display name too
+    }
+}
+
+function initializeCardEditing() {
+    // Delegate event listener for all edit buttons (only shown for unsynced entries)
+    document.body.addEventListener('click', async (e) => {
+        const editBtn = e.target.closest('.edit-btn');
+        if (editBtn) {
+            const card = editBtn.closest('.ressource-card, .production-card, .ventes-card, .deblai-card');
+            if (card) {
+                startEditingCard(card);
+            }
+        }
+
+        // Handle save button clicks
+        const saveBtn = e.target.closest('.card-save-btn');
+        if (saveBtn) {
+            const card = saveBtn.closest('.ressource-card, .production-card, .ventes-card, .deblai-card');
+            if (card) {
+                const success = await saveCard(card, dateInput.value);
+                if (success) {
+                    finishEditingCard(card, true);
+                    updateSyncStatusUI(navigator.onLine, 'Modifications enregistrées localement.');
+                    await loadEntriesForDate(dateInput.value);
+                    await updateGasoilDateBadges(dateInput.value);
+                    updateUnsyncedCount();
+                } else {
+                    alert('Veuillez remplir tous les champs obligatoires.');
+                }
+            }
+        }
+
+        // Handle cancel button clicks
+        const cancelBtn = e.target.closest('.card-cancel-btn');
+        if (cancelBtn) {
+            const card = cancelBtn.closest('.ressource-card, .production-card, .ventes-card, .deblai-card');
+            if (card) {
+                finishEditingCard(card, false);
+            }
+        }
+
+        // Handle delete button clicks
+        const deleteBtn = e.target.closest('.card-delete-btn');
+        if (deleteBtn) {
+            const card = deleteBtn.closest('.ressource-card, .production-card, .ventes-card, .deblai-card');
+            if (card && confirm('Êtes-vous sûr de vouloir supprimer cette entrée ?')) {
+                await deleteCard(card);
+                await loadEntriesForDate(dateInput.value);
+                await updateGasoilDateBadges(dateInput.value);
+                updateUnsyncedCount();
+                updateSyncStatusUI(navigator.onLine, 'Entrée supprimée.');
+            }
+        }
+    });
+}
+
+function startEditingCard(card) {
+    // Store original values for cancel functionality
+    card.dataset.originalValues = JSON.stringify(getCardValues(card));
+
+    // Make form fields editable
+    setCardReadOnly(card, false, -1);
+
+    // Hide edit button and show editing controls
+    if (card.querySelector('.edit-btn')) {
+        card.querySelector('.edit-btn').style.display = 'none';
+    }
+
+    // Add Save/Cancel/Delete buttons to card footer
+    const existingControls = card.querySelector('.card-edit-controls');
+    if (existingControls) {
+        existingControls.remove();
+    }
+
+    const controls = document.createElement('div');
+    controls.className = 'card-edit-controls';
+    controls.innerHTML = `
+        <button class="card-save-btn">Enregistrer</button>
+        <button class="card-cancel-btn">Annuler</button>
+        <button class="card-delete-btn">Supprimer</button>
+    `;
+    card.appendChild(controls);
+}
+
+function finishEditingCard(card, saved) {
+    if (!saved) {
+        // Restore original values
+        const originalValues = JSON.parse(card.dataset.originalValues || '{}');
+        setCardValues(card, originalValues);
+    }
+
+    // Clean up stored values
+    delete card.dataset.originalValues;
+
+    // Make card read-only again
+    const syncStatus = card.classList.contains('status-synced') ?
+        1 : card.classList.contains('status-saved') ? 0 : -1;
+    setCardReadOnly(card, true, syncStatus);
+
+    // Remove editing controls
+    const controls = card.querySelector('.card-edit-controls');
+    if (controls) {
+        controls.remove();
+    }
+}
+
+function getCardValues(card) {
+    const values = {};
+    card.querySelectorAll('input, select, textarea').forEach(field => {
+        if (field.name) {
+            values[field.name] = field.value;
+        }
+    });
+
+    // Handle resource rows for ressource cards
+    if (card.classList.contains('ressource-card')) {
+        const resourceRows = [];
+        card.querySelectorAll('.resource-row').forEach(row => {
+            const resourceSelect = row.querySelector('select[name="resource"]');
+            const quantityInput = row.querySelector('input[name="quantity"]');
+            if (resourceSelect && quantityInput) {
+                resourceRows.push({
+                    resource: resourceSelect.value,
+                    quantity: quantityInput.value
+                });
+            }
+        });
+        values.resourceRows = resourceRows;
+    }
+
+    return values;
+}
+
+function setCardValues(card, values) {
+    card.querySelectorAll('input, select, textarea').forEach(field => {
+        if (field.name && values[field.name] !== undefined) {
+            field.value = values[field.name];
+        }
+    });
+
+    // Handle resource rows for ressource cards
+    if (card.classList.contains('ressource-card') && values.resourceRows) {
+        const resourcesContainer = card.querySelector('.resources-container');
+        if (resourcesContainer) {
+            resourcesContainer.innerHTML = '';
+            values.resourceRows.forEach(rowData => {
+                const row = addResourceRow(card);
+                row.querySelector('select[name="resource"]').value = rowData.resource;
+                row.querySelector('input[name="quantity"]').value = rowData.quantity;
+            });
+        }
+    }
+}
+
+async function deleteCard(card) {
+    const id = card.dataset.id ? parseInt(card.dataset.id, 10) : null;
+    if (!id) return;
+
+    let tableName, listName;
+    if (card.classList.contains('ressource-card')) {
+        // For resource cards, delete all entries for this machine on this date
+        tableName = 'formEntries';
+        listName = config.sharePoint.lists.formEntries;
+
+        // Get the entry to find the machine name and date
+        const entry = await db.formEntries.get(id);
+        if (entry) {
+            // Find and delete all entries for this machine on this date
+            const allEntriesForMachine = await db.formEntries
+                .where({ machine: entry.machine, date: entry.date })
+                .toArray();
+
+            for (const entryToDelete of allEntriesForMachine) {
+                await deleteEntryAndQueue(tableName, listName, entryToDelete.id);
+            }
+        }
+    } else if (card.classList.contains('production-card')) {
+        tableName = 'production';
+        listName = config.sharePoint.lists.production;
+        await deleteEntryAndQueue(tableName, listName, id);
+    } else if (card.classList.contains('ventes-card')) {
+        tableName = 'ventes';
+        listName = config.sharePoint.lists.ventes;
+        await deleteEntryAndQueue(tableName, listName, id);
+    } else if (card.classList.contains('deblai-card')) {
+        tableName = 'deblai';
+        listName = config.sharePoint.lists.deblai;
+        await deleteEntryAndQueue(tableName, listName, id);
+    }
 }
 
 async function saveCard(card, entryDate) {
@@ -764,8 +1167,8 @@ async function saveCard(card, entryDate) {
                 date: entryDate,
                 client: clientInput.value.trim(),
                 produit: produitInput.value,
-                quantite: quantiteInput.value.trim(),
-                montantPaye: parseFloat(montantPayeInput.value) || 0,
+                quantite: parseFloat(quantiteInput.value),
+                montantPaye: parseFloat(montantPayeInput.value),
                 commentaire: card.querySelector('[name="commentaire"]').value.trim(),
                 syncStatus: 0
             };
@@ -825,66 +1228,7 @@ async function saveCard(card, entryDate) {
     return isValid;
 }
 
-function toggleEditMode(isEditing) {
-    const editDayBtn = document.getElementById('edit-day-btn');
-    const deleteSelectedBtn = document.getElementById('delete-selected-btn');
-    const saveAllBtn = document.getElementById('save-all-btn');
-    const allCards = document.querySelectorAll('.ressource-card, .production-card, .ventes-card, .deblai-card');
 
-    if (isEditing) {
-        editDayBtn.textContent = 'Enregistrer les Modifications';
-        editDayBtn.style.backgroundColor = '#4CAF50';
-        saveAllBtn.style.display = 'none';
-        allCards.forEach(card => {
-            // Only allow editing for unsynced cards
-            if (card.classList.contains('status-synced')) {
-                setCardReadOnly(card, true, 1); // keep synced cards read-only
-            } else {
-                setCardReadOnly(card, false, -1);
-                card.style.border = '2px dashed #2196f3';
-            }
-        });
-    } else {
-        saveAllBtn.click();
-        editDayBtn.textContent = 'Modifier la Journée';
-        editDayBtn.style.backgroundColor = '#2196f3';
-        deleteSelectedBtn.style.display = 'none';
-        saveAllBtn.style.display = 'inline-block';
-        allCards.forEach(card => {
-            card.style.border = '';
-        });
-    }
-
-}
-async function handleDeleteSelection() {
-    const selectedCheckboxes = Array.from(document.querySelectorAll('.entry-checkbox:checked'));
-    if (selectedCheckboxes.length === 0) return;
-
-    if (confirm(`Êtes-vous sûr de vouloir supprimer les ${selectedCheckboxes.length} entrées sélectionnées ?`)) {
-        for (const cb of selectedCheckboxes) {
-            const card = cb.closest('.ressource-card, .production-card, .ventes-card, .deblai-card');
-            if (card) {
-                const id = parseInt(card.dataset.id, 10);
-                let tableName;
-                if (card.classList.contains('ressource-card')) {
-                    tableName = 'formEntries';
-                } else if (card.classList.contains('production-card')) {
-                    tableName = 'production';
-                } else if (card.classList.contains('ventes-card')) {
-                    tableName = 'ventes';
-                } else if (card.classList.contains('deblai-card')) {
-                    tableName = 'deblai';
-                }
-
-                if (id && tableName) {
-                    const listName = config.sharePoint.lists[tableName];
-                    await deleteEntryAndQueue(tableName, listName, id);
-                }
-            }
-        }
-        await loadEntriesForDate(dateInput.value);
-    }
-}
 
 async function loadClientOptions() {
   const clientList = document.getElementById('client-list');
@@ -918,6 +1262,13 @@ export async function loadEntriesForDate(dateString) {
     }
 
     const { ressources, production, ventes, deblai } = await getAllEntriesByDate(dateString);
+
+    // CRITICAL: Populate selectedMachines with already-saved machines to prevent duplicates
+    selectedMachines.clear();
+    ressources.forEach(entry => {
+        if (entry.machine) selectedMachines.add(entry.machine);
+    });
+    updateMachineDatalist();
 
     if (ressources.length === 0 && production.length === 0 && ventes.length === 0 && deblai.length === 0) {
         if(syncStatusElement) syncStatusElement.textContent = `Pas de données pour ${dateString}. Prêt pour une nouvelle saisie.`;
@@ -965,11 +1316,11 @@ async function updateProductionTotals(dailyEntries, currentDate) {
     const totalWeightStockOut = stockOutEntries.reduce((sum, e) => sum + (e.poids * (e.voyages || 1)), 0);
     const stockRestant = totalWeightStockage - totalWeightStockOut;
 
-    // Calculate cumul (running totals)
+    // Calculate cumul (running totals) using global cumul start date
     let cumulConcassage = 0;
     let cumulExtraction = 0;
 
-    const startDate = await getGasoilLivraisonDateForPeriod(currentDate) || await getEarliestDataDate();
+    const startDate = await getEffectiveCumulStartDate();
 
     if (startDate) {
         const cumulEntries = await getProductionByDateRange(startDate, currentDate);
@@ -1049,11 +1400,11 @@ async function updateVentesTotals(dailyEntries, currentDate) {
         productTotalsHtml += `<div><strong>${product}:</strong> ${totalInTons.toFixed(2)} tonnes</div>`;
     }
 
-    // Calculate cumul (running totals)
+    // Calculate cumul (running totals) using global cumul start date
     let cumulRevenue = 0;
     let cumulTonnes = 0;
 
-    const startDate = await getGasoilLivraisonDateForPeriod(currentDate) || await getEarliestDataDate();
+    const startDate = await getEffectiveCumulStartDate();
 
     if (startDate) {
         const cumulEntries = await getVentesByDateRange(startDate, currentDate);
@@ -1202,7 +1553,9 @@ async function updateGasoilDateBadges(currentDate) {
     };
 
     // Helper to create GE35 hours badge (non-clickable)
-    const createGE35Badge = async (startDate) => {
+    const createGE35Badge = async () => {
+        // Use the global effective cumulative start date, not gasoil hard-coded date
+        const startDate = await getEffectiveCumulStartDate();
         if (!startDate) return null;
 
         const formEntries = await getFormEntriesByDateRange(startDate, currentDate);

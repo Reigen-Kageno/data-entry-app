@@ -52,7 +52,7 @@ class MasterDataManager {
                 const endpoint = new URL(`https://graph.microsoft.com/v1.0/sites/${config.sharePoint.siteId}/lists/${config.sharePoint.lists.machines}/items`);
                 endpoint.searchParams.append('expand', 'fields');
                 // Select fields based on original app.js and schema requirements
-                endpoint.searchParams.append('select', 'id,fields/ID_x0020_Machine,fields/Title,fields/Machines,fields/Lieu,fields/TypeMachine,fields/Active');
+                endpoint.searchParams.append('select', 'id,fields/ID_x0020_Machine,fields/Title,fields/field_1,fields/Lieu,fields/TypeMachine,fields/Active');
 
                 console.log('MasterDataManager: Fetching machines from endpoint:', endpoint.toString());
 
@@ -90,7 +90,7 @@ class MasterDataManager {
                 const newMachines = data.value.map(item => ({
                     sharepointId: item.id, // Use Graph item ID as sharepointId
                     idMachine: item.fields.ID_x0020_Machine || item.fields.Title,
-                    displayName: item.fields.TypeMachine || item.fields.Title, // Prefer TypeMachine, fallback to Title
+                    displayName: item.fields.field_1, // Prefer Machine column, fallback to Title
                     location: item.fields.Lieu || '',
                     machineType: item.fields.TypeMachine || '',
                     active: item.fields.Active == 1 ? 1 : 0, // SharePoint 'Active' column is 1 for true, 0 for false.

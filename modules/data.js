@@ -313,3 +313,76 @@ export async function getFormEntriesByDateRange(startDate, endDate) {
         return [];
     }
 }
+
+// Function to find all mining process start dates (returns multiple for badge display)
+// Returns array of up to 3 most recent mining dates for navigation badges
+export async function getMiningProcessStartDates(currentDate, limit = 3) {
+    try {
+        // Configurable comment keywords to handle variations like "debut minage" vs "début minage"
+        const MINING_COMMENT_KEYWORDS = ['debut minage', 'début minage'];
+        let allMiningDates = [];
+
+        for (const keyword of MINING_COMMENT_KEYWORDS) {
+            const miningEntries = await db.formEntries
+                .where('machine').equals('FOR')  // Exact match since machine name is validated
+                .and(entry => entry.commentaire && entry.commentaire.toLowerCase().includes(keyword))
+                .and(entry => entry.date <= currentDate)
+                .sortBy('date');
+
+            if (miningEntries.length > 0) {
+                const dates = miningEntries.map(entry => entry.date);
+                // Remove duplicates and add to collection
+                allMiningDates = [...new Set([...allMiningDates, ...dates])].sort();
+            }
+        }
+
+        // Return up to specified limit, most recent first
+        const result = allMiningDates.slice(-limit);
+
+        console.log(`Found ${result.length} mining start dates:`, result);
+        return result;
+    } catch (error) {
+        console.error('Error fetching mining process start dates:', error);
+        return [];
+    }
+}
+
+// Function to find the most recent mining process start date (backward compatibility)
+export async function getMiningProcessStartDate(currentDate) {
+    const dates = await getMiningProcessStartDates(currentDate, 1);
+    return dates.length > 0 ? dates[0] : null;
+}
+
+// Function to get mining navigation dates for badge display (similar to gasoil)
+export async function getMiningLivraisonNavigationDates(currentDate, limit = 3) {
+    try {
+        const miningDates = await getMiningProcessStartDates(currentDate, limit);
+
+        if (miningDates.length === 0) {
+            return { current: null, previous: null, next: null, all: [] };
+        }
+
+        // Find current period start (most recent date <= currentDate)
+        const currentPeriodDate = miningDates
+            .filter(date => date <= currentDate)
+            .sort()
+            .pop(); // Last (most recent) date <= currentDate
+
+        // Find previous (date before current period start)
+        const currentIndex = miningDates.indexOf(currentPeriodDate);
+        const previousDate = currentIndex > 0 ? miningDates[currentIndex - 1] : null;
+
+        // Find next (first date after currentDate)
+        const nextDate = miningDates.find(date => date > currentDate) || null;
+
+        return {
+            current: currentPeriodDate,
+            previous: previousDate,
+            next: nextDate,
+            all: miningDates  // All available mining dates for potential use
+        };
+    } catch (error) {
+        console.error('Error fetching mining navigation dates:', error);
+        return { current: null, previous: null, next: null, all: [] };
+    }
+}

@@ -4,7 +4,24 @@ This document tracks significant changes and updates to the SOECO Basalt Site Da
 
 ## [Unreleased]
 
+### **Added**
+- **Configurable Cumulative Periods**: Added global cumulative start date control affecting all Production, Ventes, and Deblai tabs
+  - Dropdown selector next to date picker with options: Auto (last gasoil), Mining Start, Custom Date
+  - Mining process detection: Automatic identification of mining start dates from "FOR" machine entries with "debut minage"/"début minage" comments
+  - Proper HTML date picker for custom dates (no more prompt dialogs)
+  - Validation prevents start dates after current date
+  - Real-time indicator showing current cumul period (e.g., "Cumul: Depuis 15 Sep")
+  - GE35 cumulative hours now respects global cumul dates (not hard-coded to gasoil)
+  - Preserves existing default gasoil livraison behavior
+  - No database schema changes required
+
 ### **Fixed**
+- **Machine Display Name Critical Issues**: Comprehensive fixes for machine display name field behavior
+  - **Always Readonly**: Fixed display name field to always be readonly, even when editing new cards (prevented user editing)
+  - **Correct SharePoint Field**: Updated data mapping to use `field_1` column instead of `TypeMachine` for machine display names
+  - **Existing Cards Population**: Previously saved cards now populate display name from database data instead of showing blank
+  - **Machine ID Validation**: Added validation to prevent invalid machine IDs and ensure data integrity
+  - **Real-time Updates**: Machine display name updates automatically when machine ID is selected/typed
 - **GE35 Hours Calculation Bug**: Fixed critical calculation error where blank compteur fields were treated as 0, corrupting accumulated hours totals and showing incorrect values
 - **Data Integrity**: Added form validation to prevent compteur fin < compteur debut, preventing illogical fuel consumption entries
 

@@ -124,13 +124,40 @@ class MasterDataManager {
     }
 
     getMachines(activeOnly = true) {
+        // Always include hardcoded "livraison" machine for gasoil delivery tracking
+        const livraisonMachine = {
+            sharepointId: null, // Not from SharePoint
+            idMachine: 'livraison',
+            displayName: 'Livraison',
+            location: '',
+            machineType: '',
+            active: 1
+        };
+
+        const machinesWithLivraison = [...this.machines, livraisonMachine];
+
         return activeOnly
-            ? this.machines.filter(m => m.active)
-            : this.machines;
+            ? machinesWithLivraison.filter(m => m.active)
+            : machinesWithLivraison;
     }
 
     findMachineByIdMachine(idMachine) {
-        return this.machines.find(m => m.idMachine === idMachine);
+        // First check in cached machines
+        let machine = this.machines.find(m => m.idMachine === idMachine);
+
+        // If not found, check if it's the hardcoded livraison machine
+        if (!machine && idMachine === 'livraison') {
+            machine = {
+                sharepointId: null, // Not from SharePoint
+                idMachine: 'livraison',
+                displayName: 'Livraison',
+                location: '',
+                machineType: '',
+                active: 1
+            };
+        }
+
+        return machine;
     }
 }
 

@@ -325,8 +325,7 @@ export async function getMiningProcessStartDates(currentDate, limit = 3) {
         for (const keyword of MINING_COMMENT_KEYWORDS) {
             const miningEntries = await db.formEntries
                 .where('machine').equals('FOR')  // Exact match since machine name is validated
-                .and(entry => entry.commentaire && entry.commentaire.toLowerCase().includes(keyword))
-                .and(entry => entry.date <= currentDate)
+                .and(entry => entry.notes && entry.notes.toLowerCase().includes(keyword))
                 .sortBy('date');
 
             if (miningEntries.length > 0) {
@@ -337,9 +336,12 @@ export async function getMiningProcessStartDates(currentDate, limit = 3) {
         }
 
         // Return up to specified limit, most recent first
-        const result = allMiningDates.slice(-limit);
+        const result = allMiningDates.slice(-limit).reverse();
 
         console.log(`Found ${result.length} mining start dates:`, result);
+        if (result.length === 0) {
+            console.warn('No mining process start dates found. Look for entries with machine="FOR" and notes containing mining keywords.');
+        }
         return result;
     } catch (error) {
         console.error('Error fetching mining process start dates:', error);
@@ -348,15 +350,37 @@ export async function getMiningProcessStartDates(currentDate, limit = 3) {
 }
 
 // Function to find the most recent mining process start date (backward compatibility)
+// For cumulative calculations - filters by date <= currentDate like gasoil does
 export async function getMiningProcessStartDate(currentDate) {
-    const dates = await getMiningProcessStartDates(currentDate, 1);
-    return dates.length > 0 ? dates[0] : null;
+    try {
+        const MINING_COMMENT_KEYWORDS = ['debut minage', 'début minage'];
+        let miningDates = [];
+
+        for (const keyword of MINING_COMMENT_KEYWORDS) {
+            const miningEntries = await db.formEntries
+                .where('machine').equals('FOR')
+                .and(entry => entry.notes && entry.notes.toLowerCase().includes(keyword) && entry.date <= currentDate)
+                .sortBy('date');
+
+            if (miningEntries.length > 0) {
+                const dates = miningEntries.map(entry => entry.date);
+                miningDates = [...new Set([...miningDates, ...dates])].sort();
+            }
+        }
+
+        const result = miningDates.length > 0 ? miningDates[miningDates.length - 1] : null;
+        return result;
+    } catch (error) {
+        console.error('Error fetching mining process start date:', error);
+        return null;
+    }
 }
 
 // Function to get mining navigation dates for badge display (similar to gasoil)
-export async function getMiningLivraisonNavigationDates(currentDate, limit = 3) {
+export async function getMiningLivraisonNavigationDates(currentDate) {
     try {
-        const miningDates = await getMiningProcessStartDates(currentDate, limit);
+        // Get ALL mining dates for navigation (like gasoil livraison - no limit)
+        const miningDates = (await getMiningProcessStartDates(currentDate)).sort();
 
         if (miningDates.length === 0) {
             return { current: null, previous: null, next: null, all: [] };

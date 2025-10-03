@@ -58,7 +58,7 @@ This section details the role of each primary JavaScript file in the application
         *   Handles retries (up to 3 attempts with 2-second delays) and timeouts (30 seconds) for SharePoint requests.
         *   Transforms raw SharePoint data into the application's `machines` table schema.
         *   Updates the IndexedDB `machines` table and its internal in-memory cache.
-    *   **Data Provision (`getMachines()`):** Provides the cached machine list to UI components (e.g., `ui.js`'s `loadMachineOptions`).
+    *   **Data Provision (`getMachines()`):** Provides the cached machine list plus a hardcoded "LIVRAISON" machine for gasoil delivery tracking to UI components (e.g., `ui.js`'s `loadMachineOptions`).
     *   **Authentication**: Acquires necessary tokens using `getToken()` from `auth.js`.
 
 *   **`auth.js` (Authentication Manager)**

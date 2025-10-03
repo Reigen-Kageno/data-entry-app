@@ -2,7 +2,7 @@ import { db } from './database.js';
 import { RESOURCES } from './constants.js';
 import { generateUUID, generateUniqueKey } from './utils.js';
 import { updateCardStockDisplay, promptForMeasuredStock, clearDailyStockCheckOverrides, getDailyStockCheckOverrides } from './stock.js';
-import { getAllEntriesByDate, deleteEntryAndQueue, getGasoilLivraisonDateForPeriod, getProductionByDateRange, getVentesByDateRange, getEarliestDataDate, getFormEntriesByDateRange, getMiningProcessStartDate } from './data.js';
+import { getAllEntriesByDate, deleteEntryAndQueue, getGasoilLivraisonDateForPeriod, getProductionByDateRange, getVentesByDateRange, getEarliestDataDate, getFormEntriesByDateRange, getMiningProcessStartDate, getMiningLivraisonNavigationDates } from './data.js';
 import { updateClientBalanceCard } from './balance.js';
 import config from '../config.global.js';
 
@@ -86,7 +86,7 @@ function setCumulPeriodMode(mode) {
     // Refresh all totals if dates are valid
     if (dateInput && dateInput.value) {
         loadEntriesForDate(dateInput.value);
-        updateGasoilDateBadges(dateInput.value);
+        updateDateBadges(dateInput.value);
     }
 }
 
@@ -100,7 +100,7 @@ function setCumulStartDate(dateString) {
         cumulPeriodMode = 'select';
         updateCumulModeUI();
         loadEntriesForDate(currentDate);
-        updateGasoilDateBadges(currentDate);
+        updateDateBadges(currentDate);
     } else {
         alert(validation.error);
     }
@@ -525,9 +525,12 @@ export function initializeAppUI(masterData) {
             console.warn('No machines found in MasterData. Falling back to default options.');
             machineOptions = [...DEFAULT_FALLBACK_MACHINES];
         }
-        if (!machineOptions.includes('Livraison')) {
-            machineOptions.push('Livraison');
+
+        // Hardcode add "livraison" as a machine option if not already present
+        if (!machineOptions.includes('livraison')) {
+            machineOptions.push('livraison');
         }
+
         updateMachineDatalist();
         updateTruckDatalist();
     };
@@ -662,7 +665,7 @@ export function initializeAppUI(masterData) {
         } else if (changesMade) {
             updateSyncStatusUI(navigator.onLine, 'Modifications enregistrées localement.');
             await loadEntriesForDate(entryDateValue);
-            await updateGasoilDateBadges(entryDateValue);
+            await updateDateBadges(entryDateValue);
             updateUnsyncedCount();
         }
     });
@@ -670,7 +673,7 @@ export function initializeAppUI(masterData) {
     dateInput.addEventListener('change', async (e) => {
         clearDailyStockCheckOverrides();
         clearTrackingSets();
-        await updateGasoilDateBadges(e.target.value);
+        await updateDateBadges(e.target.value);
         loadEntriesForDate(e.target.value);
     });
 
@@ -738,7 +741,7 @@ export function initializeAppUI(masterData) {
     }
 
     loadEntriesForDate(dateInput.value);
-    updateGasoilDateBadges(dateInput.value);
+    updateDateBadges(dateInput.value);
     updateSyncButtonState();
     updateUnsyncedCount();
     updateCumulModeUI();
@@ -829,7 +832,7 @@ function initializeCardEditing() {
                     finishEditingCard(card, true);
                     updateSyncStatusUI(navigator.onLine, 'Modifications enregistrées localement.');
                     await loadEntriesForDate(dateInput.value);
-                    await updateGasoilDateBadges(dateInput.value);
+                    await updateDateBadges(dateInput.value);
                     updateUnsyncedCount();
                 } else {
                     alert('Veuillez remplir tous les champs obligatoires.');
@@ -853,7 +856,7 @@ function initializeCardEditing() {
             if (card && confirm('Êtes-vous sûr de vouloir supprimer cette entrée ?')) {
                 await deleteCard(card);
                 await loadEntriesForDate(dateInput.value);
-                await updateGasoilDateBadges(dateInput.value);
+                await updateDateBadges(dateInput.value);
                 updateUnsyncedCount();
                 updateSyncStatusUI(navigator.onLine, 'Entrée supprimée.');
             }
@@ -1511,12 +1514,21 @@ function formatGasoilDate(dateString) {
     return `${monthNames[date.getMonth()]} ${date.getDate()}`;
 }
 
-// Function to update gasoil livraison date badges
-async function updateGasoilDateBadges(currentDate) {
+// Function to update period date badges based on current cumul mode
+async function updateDateBadges(currentDate) {
     const indicator = document.getElementById('gasoil-dates-indicator');
     if (!indicator) return;
 
-    const { current, previous, next } = await getGasoilLivraisonNavigationDates(currentDate);
+    // Choose the appropriate date source based on cumulative mode
+    let navigationDates;
+    if (cumulPeriodMode === 'mining') {
+        navigationDates = await getMiningLivraisonNavigationDates(currentDate);
+    } else {
+        // For 'auto' and 'select' modes, use gasoil livraison dates
+        navigationDates = await getGasoilLivraisonNavigationDates(currentDate);
+    }
+
+    const { current, previous, next } = navigationDates;
 
     // Clear existing badges
     indicator.innerHTML = '';
@@ -1628,19 +1640,59 @@ async function updateGasoilDateBadges(currentDate) {
     const ge35Badge = await createGE35Badge(current);
     if (ge35Badge) indicator.appendChild(ge35Badge);
 
-    // Add badges in order: previous, current, next
-    if (previous) {
-        const prevBadge = createBadge(previous, 'previous', 'Livraison précédente');
-        if (prevBadge) indicator.appendChild(prevBadge);
-    }
+    // Handle mining mode special logic: show max 3 badges centered around current
+    if (cumulPeriodMode === 'mining') {
+        // Get all available mining dates sorted chronologically
+        const allMiningDates = navigationDates.all || [];
+        if (allMiningDates.length > 0) {
+            // Find current date position in the sorted list
+            const currentIndex = allMiningDates.indexOf(current);
 
-    if (current) {
-        const currentBadge = createBadge(current, 'current', 'Début période cumul');
-        if (currentBadge) indicator.appendChild(currentBadge);
-    }
+            if (currentIndex >= 0) {
+                // Show up to 3 dates: current +/- 1
+                const startIndex = Math.max(0, currentIndex - 1);
+                const endIndex = Math.min(allMiningDates.length, currentIndex + 2);
+                const displayDates = allMiningDates.slice(startIndex, endIndex);
 
-    if (next) {
-        const nextBadge = createBadge(next, 'next', 'Livraison suivante');
-        if (nextBadge) indicator.appendChild(nextBadge);
+                // Add badges chronologically: oldest first, then current, then newer
+                displayDates.forEach(dateStr => {
+                    if (dateStr === current) {
+                        const currentBadge = createBadge(dateStr, 'current', 'Début période cumul minage');
+                        if (currentBadge) indicator.appendChild(currentBadge);
+                    } else if (dateStr < current) {
+                        const prevBadge = createBadge(dateStr, 'previous', 'Début minage précédent');
+                        if (prevBadge) indicator.appendChild(prevBadge);
+                    } else {
+                        const nextBadge = createBadge(dateStr, 'next', 'Début minage suivant');
+                        if (nextBadge) indicator.appendChild(nextBadge);
+                    }
+                });
+            } else if (allMiningDates.length > 0) {
+                // Current date is after all mining dates - show last 2 + indicate current is beyond
+                const recentDates = allMiningDates.slice(-2);
+                recentDates.forEach(dateStr => {
+                    const prevBadge = createBadge(dateStr, 'previous', 'Début minage précédent');
+                    if (prevBadge) indicator.appendChild(prevBadge);
+                });
+                // Could add a ">" indicator here if needed, but keeping simple for now
+            }
+        }
+    } else {
+        // Standard gasoil livraison logic
+        // Add badges in order: previous, current, next
+        if (previous) {
+            const prevBadge = createBadge(previous, 'previous', 'Livraison précédente');
+            if (prevBadge) indicator.appendChild(prevBadge);
+        }
+
+        if (current) {
+            const currentBadge = createBadge(current, 'current', 'Début période cumul');
+            if (currentBadge) indicator.appendChild(currentBadge);
+        }
+
+        if (next) {
+            const nextBadge = createBadge(next, 'next', 'Livraison suivante');
+            if (nextBadge) indicator.appendChild(nextBadge);
+        }
     }
 }

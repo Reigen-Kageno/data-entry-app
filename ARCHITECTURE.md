@@ -205,7 +205,20 @@ graph TD
 *   **`machines`**: Stores master data about machines. Populated and managed by `masterData.js`. Includes `idMachine` (unique identifier), `displayName` (for UI), `active` status, `location`, and `machineType`.
 *   **`ventes`**: Stores sales records. Includes `syncStatus` and `sharepointId`.
 
-## 6. Error Handling & Robustness
+## 6. Synchronization Patterns
+
+The application employs specific patterns for data synchronization with SharePoint to ensure consistency and prevent data loss.
+
+*   **Bidirectional Field Mapping**: New database columns require BOTH import (from SharePoint in `refreshAllDataFromServer`) and export (to SharePoint in `createPayload` functions) mappings to maintain full sync capability.
+*   **Safe Type Conversion**: SharePoint returns all fields as strings regardless of column type. Use appropriate parsing functions:
+    *   Numbers: `parseInt(item.fields.Field, 10) || 0` or `parseFloat(item.fields.Field) || 0`
+    *   Booleans: `Boolean(item.fields.Field)`
+    *   Fallback with `|| defaultValue` prevents `NaN` or `null` values from breaking calculations
+*   **Column Existence Verification**: When adding sync for existing columns, verify field names in SharePoint API responses - some columns may have different names (e.g., `"Voyages"` vs `"voyages"`).
+*   **Transaction Safety**: All bulk database operations use Dexie.js transactions to ensure atomicity and prevent partial state updates.
+*   **Unique Key Deduplication**: Primarily uses unique keys for preventing duplicates during sync, except for stock checks which use stable `sharepointId` references.
+
+## 7. Error Handling & Robustness
 
 *   **Network Retries**: `masterData.js` implements retries for SharePoint API calls.
 *   **Atomic DB Operations**: Dexie.js transactions are used for critical database updates (e.g., `masterData.refreshFromSharePoint()`).

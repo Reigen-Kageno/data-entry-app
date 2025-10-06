@@ -123,18 +123,20 @@ class MasterDataManager {
 
     }
 
-    getMachines(activeOnly = true) {
-        // Always include hardcoded "livraison" machine for gasoil delivery tracking
-        const livraisonMachine = {
-            sharepointId: null, // Not from SharePoint
+    // Hardcoded livraison machine for gasoil delivery tracking
+    #getLivraisonMachine() {
+        return {
+            sharepointId: null,
             idMachine: 'livraison',
             displayName: 'Livraison',
             location: '',
             machineType: '',
             active: 1
         };
+    }
 
-        const machinesWithLivraison = [...this.machines, livraisonMachine];
+    getMachines(activeOnly = true) {
+        const machinesWithLivraison = [...this.machines, this.#getLivraisonMachine()];
 
         return activeOnly
             ? machinesWithLivraison.filter(m => m.active)
@@ -142,21 +144,11 @@ class MasterDataManager {
     }
 
     findMachineByIdMachine(idMachine) {
-        // First check in cached machines
         let machine = this.machines.find(m => m.idMachine === idMachine);
 
-        // If not found, check if it's the hardcoded livraison machine
         if (!machine && idMachine === 'livraison') {
-            machine = {
-                sharepointId: null, // Not from SharePoint
-                idMachine: 'livraison',
-                displayName: 'Livraison',
-                location: '',
-                machineType: '',
-                active: 1
-            };
+            machine = this.#getLivraisonMachine();
         }
-
         return machine;
     }
 }

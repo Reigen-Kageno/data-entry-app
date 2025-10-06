@@ -100,6 +100,7 @@ export async function refreshAllDataFromServer() {
             date: item.fields.Date.split('T')[0],
             idCamion: item.fields.IDCamion,
             poids: parseFloat(item.fields.Poids) || 0,
+            voyages: parseInt(item.fields.Voyages, 10) || 0,
             origine: item.fields.Origine,
             destination: item.fields.Destination,
             commentaire: item.fields.Commentaire,
@@ -332,6 +333,7 @@ export async function syncQueuedEntries(showStatus = true, manualTrigger = false
                 Date: `${prod.date}T00:00:00Z`,
                 IDCamion: String(prod.idCamion),
                 Poids: String(prod.poids),
+                Voyages: String(prod.voyages || 1),
                 Origine: String(prod.origine),
                 Destination: String(prod.destination),
                 Commentaire: String(prod.commentaire || '')

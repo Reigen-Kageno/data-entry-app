@@ -1640,42 +1640,22 @@ async function updateDateBadges(currentDate) {
     const ge35Badge = await createGE35Badge(current);
     if (ge35Badge) indicator.appendChild(ge35Badge);
 
-    // Handle mining mode special logic: show max 3 badges centered around current
+    // Show badges in consistent order for both gasoil and mining modes
     if (cumulPeriodMode === 'mining') {
-        // Get all available mining dates sorted chronologically
-        const allMiningDates = navigationDates.all || [];
-        if (allMiningDates.length > 0) {
-            // Find current date position in the sorted list
-            const currentIndex = allMiningDates.indexOf(current);
+        // Add badges in order: previous, current, next (same as gasoil)
+        if (previous) {
+            const prevBadge = createBadge(previous, 'previous', 'Début minage précédent');
+            if (prevBadge) indicator.appendChild(prevBadge);
+        }
 
-            if (currentIndex >= 0) {
-                // Show up to 3 dates: current +/- 1
-                const startIndex = Math.max(0, currentIndex - 1);
-                const endIndex = Math.min(allMiningDates.length, currentIndex + 2);
-                const displayDates = allMiningDates.slice(startIndex, endIndex);
+        if (current) {
+            const currentBadge = createBadge(current, 'current', 'Début période cumul minage');
+            if (currentBadge) indicator.appendChild(currentBadge);
+        }
 
-                // Add badges chronologically: oldest first, then current, then newer
-                displayDates.forEach(dateStr => {
-                    if (dateStr === current) {
-                        const currentBadge = createBadge(dateStr, 'current', 'Début période cumul minage');
-                        if (currentBadge) indicator.appendChild(currentBadge);
-                    } else if (dateStr < current) {
-                        const prevBadge = createBadge(dateStr, 'previous', 'Début minage précédent');
-                        if (prevBadge) indicator.appendChild(prevBadge);
-                    } else {
-                        const nextBadge = createBadge(dateStr, 'next', 'Début minage suivant');
-                        if (nextBadge) indicator.appendChild(nextBadge);
-                    }
-                });
-            } else if (allMiningDates.length > 0) {
-                // Current date is after all mining dates - show last 2 + indicate current is beyond
-                const recentDates = allMiningDates.slice(-2);
-                recentDates.forEach(dateStr => {
-                    const prevBadge = createBadge(dateStr, 'previous', 'Début minage précédent');
-                    if (prevBadge) indicator.appendChild(prevBadge);
-                });
-                // Could add a ">" indicator here if needed, but keeping simple for now
-            }
+        if (next) {
+            const nextBadge = createBadge(next, 'next', 'Début minage suivant');
+            if (nextBadge) indicator.appendChild(nextBadge);
         }
     } else {
         // Standard gasoil livraison logic

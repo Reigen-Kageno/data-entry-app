@@ -11,7 +11,10 @@
 - **UI Updates**: Renamed `updateGasoilDateBadges` to `updateDateBadges` and made it mode-aware to handle both gasoil and mining navigation badges
 - **Navigation Logic**: Mining date navigation works correctly, collecting future mining dates and finding next dates after current date
 - **Sorting Logic**: Mining date sorting correctly returns most recent dates first using slice(-limit) and reverse() combination
+- **Mining Badge Consistency**: Mining mode now displays badges exactly like gasoil mode (previous/current/next instead of centered display) for consistent navigation behavior
+- **Code Deduplication**: Eliminated duplicate mining start date functions by consolidating shared logic into `getAllMiningStartDates()` helper, reducing code duplication by ~90%
+- **Production Voyages Sync**: Fixed production entries not syncing the voyages column with SharePoint - now properly reads voyages from server on refresh and sends voyages to server on sync
 
 ### Enhanced
-- **Data Integrity**: MasterData manager already includes hardcoded livraison machine in `findMachineByIdMachine` and `getMachines` methods
+-- **Data Integrity**: Clarified that MasterData manager includes a hardcoded livraison machine in `findMachineByIdMachine` and `getMachines` methods
 - **Mode-Aware Badges**: Current period badge tooltip dynamically shows "Début minage" vs "Début période cumul" based on selected cumul mode

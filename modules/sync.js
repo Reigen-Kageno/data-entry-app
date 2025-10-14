@@ -100,7 +100,7 @@ export async function refreshAllDataFromServer() {
             date: item.fields.Date.split('T')[0],
             idCamion: item.fields.IDCamion,
             poids: parseFloat(item.fields.Poids) || 0,
-            voyages: parseInt(item.fields.Voyages, 10) || 0,
+            voyages: parseInt(item.fields.voyages, 10) || 0,
             origine: item.fields.Origine,
             destination: item.fields.Destination,
             commentaire: item.fields.Commentaire,
@@ -121,7 +121,7 @@ export async function refreshAllDataFromServer() {
             uniqueKey: item.fields.Title,
             date: item.fields.date.split('T')[0],
             idCamion: item.fields.IDCamion,
-            voyages: parseInt(item.fields.Voyages, 10) || 0,
+            voyages: parseInt(item.fields.voyages, 10) || 0,
             commentaire: item.fields.Commentaire,
             sharepointId: item.id,
             syncStatus: 1
@@ -177,6 +177,8 @@ async function syncTable(token, dbTable, listName, createPayload, isStockCheck =
     if (queuedItems.length === 0) return;
 
     console.log(`Syncing ${queuedItems.length} items for ${dbTable.name}`);
+
+    let tableSyncErrors = [];
 
     for (const item of queuedItems) {
         try {
@@ -235,13 +237,27 @@ async function syncTable(token, dbTable, listName, createPayload, isStockCheck =
                 console.log(`Successfully synced item from ${dbTable.name}. SharePoint ID: ${finalSpId}`);
             } else {
                 const errorText = await response.text();
-                throw new Error(`SharePoint ${method} failed: ${response.status} - ${errorText}`);
+                const error = new Error(`SharePoint ${method} failed: ${response.status} - ${errorText}`);
+                console.error(`Failed to sync item from ${dbTable.name}:`, error);
+                tableSyncErrors.push({
+                    table: dbTable.name,
+                    error: error.message,
+                    itemKey: isStockCheck ? `${item.resourceName}-${item.date}` : item.uniqueKey
+                });
+                // Continue processing other items even on error
             }
 
         } catch (error) {
             console.error(`Failed to sync item from ${dbTable.name}:`, error);
+            tableSyncErrors.push({
+                table: dbTable.name,
+                error: error.message,
+                itemKey: isStockCheck ? `${item.resourceName}-${item.date}` : item.uniqueKey
+            });
         }
     }
+
+    return tableSyncErrors;
 }
 
 async function syncDeletions(token) {
@@ -333,7 +349,7 @@ export async function syncQueuedEntries(showStatus = true, manualTrigger = false
                 Date: `${prod.date}T00:00:00Z`,
                 IDCamion: String(prod.idCamion),
                 Poids: String(prod.poids),
-                Voyages: String(prod.voyages || 1),
+                voyages: String(prod.voyages || 1),
                 Origine: String(prod.origine),
                 Destination: String(prod.destination),
                 Commentaire: String(prod.commentaire || '')
@@ -360,15 +376,44 @@ export async function syncQueuedEntries(showStatus = true, manualTrigger = false
         });
 
         // Run sync for all tables and deletions
-        await Promise.all([
+        const [
+            formEntryErrors,
+            stockCheckErrors,
+            venteErrors,
+            productionErrors,
+            clientPaymentErrors,
+            deblaiErrors
+        ] = await Promise.all([
             syncTable(token, db.formEntries, config.sharePoint.lists.formEntries, createFormEntryPayload),
             syncTable(token, db.stockChecks, config.sharePoint.lists.stockChecks, createStockCheckPayload, true),
             syncTable(token, db.ventes, config.sharePoint.lists.ventes, createVentePayload),
             syncTable(token, db.production, config.sharePoint.lists.production, createProductionPayload),
             syncTable(token, db.clientPayments, config.sharePoint.lists.clientPayments, createClientPaymentPayload),
-            syncTable(token, db.deblai, config.sharePoint.lists.deblai, createDeblaiPayload),
-            syncDeletions(token)
+            syncTable(token, db.deblai, config.sharePoint.lists.deblai, createDeblaiPayload)
         ]);
+
+        // Collect all sync errors from all tables
+        const allSyncErrors = [
+            ...(formEntryErrors || []),
+            ...(stockCheckErrors || []),
+            ...(venteErrors || []),
+            ...(productionErrors || []),
+            ...(clientPaymentErrors || []),
+            ...(deblaiErrors || [])
+        ];
+
+        await syncDeletions(token);
+
+        // Check for sync errors and display them to user
+        if (allSyncErrors.length > 0) {
+            console.error('Sync errors occurred:', allSyncErrors);
+            updateSyncStatusUI(true, `Erreurs de synchronisation : ${allSyncErrors.length} éléments ont échoué`);
+            // Also show first few errors in status for visibility
+            const firstError = allSyncErrors[0];
+            setTimeout(() => {
+                updateSyncStatusUI(true, `Erreur ${firstError.table}: ${firstError.error}`);
+            }, 3000);
+        }
 
         // Final status update
         const remainingEntries = await db.formEntries.where('syncStatus').equals(0).count();
